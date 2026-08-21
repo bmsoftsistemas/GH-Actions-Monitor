@@ -89,14 +89,28 @@ instalar — pelo banner na janela, notificação do sistema, ou item no menu
 da bandeja). Isso só roda no app empacotado (`app.isPackaged`); em
 `npm start` fica inerte de propósito.
 
-Falta configurar **onde** as versões publicadas ficam hospedadas — isso é
-feito pela chave `build.publish` no `package.json`, que ainda não está
-definida. A opção mais comum com `electron-builder` é GitHub Releases:
-criar um repositório no GitHub, adicionar `"publish": { "provider": "github" }`
-ao `build` do `package.json`, e rodar `electron-builder --publish always`
-(com a variável `GH_TOKEN` definida) para subir cada release. Sem isso, o
-auto-updater no app empacotado vai falhar silenciosamente ao checar
-atualizações (erro tratado, não derruba o app).
+As versões publicadas ficam hospedadas em GitHub Releases, no repositório
+[`bmsoftsistemas/GH-Actions-Monitor`](https://github.com/bmsoftsistemas/GH-Actions-Monitor)
+(configurado em `build.publish` no `package.json`).
+
+### Publicando uma nova versão
+
+```bash
+npm run release -- patch   # ou minor / major / 1.2.3
+```
+
+Isso automatiza (`scripts/release.js`):
+
+1. `npm version` — bump da versão no `package.json`, commit e tag git.
+2. `git push` do commit e da tag.
+3. `electron-builder --publish always` — builda o instalador e cria a
+   release no GitHub (usa `gh auth token` automaticamente se `GH_TOKEN`
+   não estiver definido no ambiente).
+4. Remove o "draft" da release, deixando-a publicada (o `electron-updater`
+   só enxerga releases publicadas, não rascunhos).
+
+Requer working tree limpo (sem mudanças não commitadas) e a GitHub CLI
+(`gh`) autenticada.
 
 ## 5. Estrutura do projeto
 
