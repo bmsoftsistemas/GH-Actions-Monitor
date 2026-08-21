@@ -121,4 +121,16 @@ store.js                    # persistência da config (token criptografado) e do
 preload.js                  # ponte segura entre a janela de configurações e o main
 settings.html/.css/.js      # janela única com as telas de Monitoramento e Configurações
 assets/                     # ícones da bandeja e do app
+test/                       # testes de watcher.js (node:test, sem dependências extras)
 ```
+
+## 6. Testes
+
+```bash
+npm test
+```
+
+Roda `test/watcher.test.js` com o test runner nativo do Node
+(`node --test`), cobrindo `checkAll`/`fetchRuns`: baseline na primeira
+checagem, dedupe de notificação, comportamento de rate limit e merge de
+runs quando um workflow falha mas outro funciona.

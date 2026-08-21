@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test test/*.test.js",
     "dist": "electron-builder",
     "release": "node scripts/release.js"
   },
@@ -13,7 +14,7 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.example.ghactionswatcher",
+    "appId": "com.bmsoftsistemas.ghactionswatcher",
     "productName": "GH Actions Watcher",
     "publish": {
       "provider": "github",
