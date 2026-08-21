@@ -146,6 +146,22 @@ function pushUpdateStatus(status) {
   }
 }
 
+/**
+ * Instala a atualização baixada. Roda o instalador em modo silencioso
+ * (sem a tela genérica do NSIS) e força o app a reabrir sozinho depois —
+ * se a janela de configurações estiver aberta, mostra antes um overlay no
+ * próprio tema do app por um instante, pra não trocar direto pro instalador.
+ */
+function installUpdate() {
+  if (!updateReady) return;
+  if (settingsWindow) {
+    settingsWindow.webContents.send("update:installing");
+    setTimeout(() => autoUpdater.quitAndInstall(true, true), 600);
+  } else {
+    autoUpdater.quitAndInstall(true, true);
+  }
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
@@ -167,7 +183,7 @@ function setupAutoUpdater() {
       body: `Versão ${info.version} baixada. Reinicie para aplicar.`,
       silent: false,
     });
-    n.on("click", () => autoUpdater.quitAndInstall());
+    n.on("click", () => installUpdate());
     n.show();
   });
 
@@ -247,7 +263,7 @@ function updateTrayMenu() {
   ];
 
   if (updateReady) {
-    template.push({ type: "separator" }, { label: "🔄 Reiniciar para atualizar", click: () => autoUpdater.quitAndInstall() });
+    template.push({ type: "separator" }, { label: "🔄 Reiniciar para atualizar", click: () => installUpdate() });
   }
 
   template.push({ type: "separator" }, { label: "Sair", click: () => app.quit() });
@@ -296,9 +312,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle("update:get-status", () => lastUpdateStatus);
 
-  ipcMain.handle("update:install", () => {
-    if (updateReady) autoUpdater.quitAndInstall();
-  });
+  ipcMain.handle("update:install", () => installUpdate());
+
+  ipcMain.handle("app:get-version", () => app.getVersion());
 
   ipcMain.handle("watcher:rerun-run", async (_event, { owner, repo, runId }) => {
     const config = loadConfig();

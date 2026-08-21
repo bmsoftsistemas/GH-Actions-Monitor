@@ -22,6 +22,8 @@ const updateBanner = document.getElementById("update-banner");
 const updateBannerText = document.getElementById("update-banner-text");
 const updateBannerBtn = document.getElementById("update-banner-btn");
 const updateStatusEl = document.getElementById("update-status");
+const appVersionEl = document.getElementById("app-version");
+const updateOverlay = document.getElementById("update-overlay");
 
 const ICON_ATTRS = 'class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
@@ -434,6 +436,14 @@ async function init() {
   }
   if (window.api.getUpdateStatus) {
     renderUpdateStatus(await window.api.getUpdateStatus());
+  }
+  if (window.api.onUpdateInstalling) {
+    window.api.onUpdateInstalling(() => {
+      updateOverlay.hidden = false;
+    });
+  }
+  if (window.api.getVersion) {
+    appVersionEl.textContent = `v${await window.api.getVersion()}`;
   }
 }
 

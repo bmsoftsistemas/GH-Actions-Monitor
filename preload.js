@@ -26,4 +26,10 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("update:status", listener);
     return () => ipcRenderer.removeListener("update:status", listener);
   },
+  onUpdateInstalling: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("update:installing", listener);
+    return () => ipcRenderer.removeListener("update:installing", listener);
+  },
+  getVersion: () => ipcRenderer.invoke("app:get-version"),
 });

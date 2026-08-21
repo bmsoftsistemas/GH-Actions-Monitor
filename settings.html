@@ -44,6 +44,7 @@
         </div>
         <div id="update-status" class="update-status" hidden></div>
         <button id="toggle-btn" class="toggle-btn">Iniciar</button>
+        <div id="app-version" class="app-version"></div>
       </div>
     </nav>
 
@@ -118,6 +119,11 @@
         </footer>
       </section>
     </main>
+
+    <div id="update-overlay" class="update-overlay" hidden>
+      <div class="update-overlay-spinner"></div>
+      <p>Atualizando — o app vai reiniciar sozinho…</p>
+    </div>
   </div>
 
   <template id="repo-row-template">

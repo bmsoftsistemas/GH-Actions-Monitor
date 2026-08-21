@@ -521,3 +521,37 @@ button:hover { background: var(--accent-hover); }
   font-size: 11px;
   padding: 0 4px;
 }
+
+.app-version {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  padding: 2px 4px 0;
+  text-align: center;
+}
+
+.update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.update-overlay-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border-hover);
+  border-top-color: var(--accent);
+  animation: update-spin 0.8s linear infinite;
+}
+
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
