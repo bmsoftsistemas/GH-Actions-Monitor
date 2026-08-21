@@ -24,6 +24,22 @@ const updateBannerBtn = document.getElementById("update-banner-btn");
 const updateStatusEl = document.getElementById("update-status");
 const appVersionEl = document.getElementById("app-version");
 const updateOverlay = document.getElementById("update-overlay");
+const rateLimitInfoEl = document.getElementById("rate-limit-info");
+
+const logModal = document.getElementById("log-modal");
+const logModalTitle = document.getElementById("log-modal-title");
+const logModalNote = document.getElementById("log-modal-note");
+const logModalContent = document.getElementById("log-modal-content");
+const logModalClose = document.getElementById("log-modal-close");
+
+const dispatchModal = document.getElementById("dispatch-modal");
+const dispatchModalClose = document.getElementById("dispatch-modal-close");
+const dispatchWorkflowFileInput = document.getElementById("dispatch-workflow-file");
+const dispatchRefInput = document.getElementById("dispatch-ref");
+const dispatchInputsInput = document.getElementById("dispatch-inputs");
+const dispatchErrorEl = document.getElementById("dispatch-error");
+const dispatchSubmitBtn = document.getElementById("dispatch-submit-btn");
+let dispatchTargetRepo = null;
 
 const ICON_ATTRS = 'class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
@@ -74,6 +90,180 @@ document.querySelectorAll(".filter-btn").forEach((btn) => {
     renderDashboard();
   });
 });
+
+/* ---------- Modal de log ---------- */
+
+function closeLogModal() {
+  logModal.hidden = true;
+}
+
+async function openLogModal({ owner, repo, jobId, jobName, stepName }) {
+  logModal.hidden = false;
+  logModalTitle.textContent = `${jobName} → ${stepName}`;
+  logModalNote.hidden = true;
+  logModalContent.textContent = "Carregando log…";
+
+  const result = await window.api.getJobLog({ owner, repo, jobId, stepName });
+
+  if (!result.ok) {
+    logModalContent.textContent = `Erro ao carregar log (status ${result.status})${result.error ? `: ${result.error}` : ""}`;
+    return;
+  }
+
+  logModalContent.textContent = result.log || "(log vazio)";
+  if (!result.isolated) {
+    logModalNote.hidden = false;
+    logModalNote.textContent =
+      "Não foi possível isolar só esse passo — mostrando o final do log do job inteiro.";
+  }
+}
+
+logModalClose.addEventListener("click", closeLogModal);
+logModal.querySelector(".app-modal-backdrop").addEventListener("click", closeLogModal);
+
+/* ---------- Modal de disparo manual (workflow_dispatch) ---------- */
+
+function openDispatchModal(repo) {
+  dispatchTargetRepo = repo;
+  dispatchWorkflowFileInput.value = repo.workflowFiles && repo.workflowFiles.length === 1 ? repo.workflowFiles[0] : "";
+  dispatchRefInput.value = "";
+  dispatchInputsInput.value = "";
+  dispatchErrorEl.hidden = true;
+  dispatchModal.hidden = false;
+}
+
+function closeDispatchModal() {
+  dispatchModal.hidden = true;
+  dispatchTargetRepo = null;
+}
+
+dispatchModalClose.addEventListener("click", closeDispatchModal);
+dispatchModal.querySelector(".app-modal-backdrop").addEventListener("click", closeDispatchModal);
+
+dispatchSubmitBtn.addEventListener("click", async () => {
+  if (!dispatchTargetRepo) return;
+
+  const workflowFile = dispatchWorkflowFileInput.value.trim();
+  const ref = dispatchRefInput.value.trim();
+  const rawInputs = dispatchInputsInput.value.trim();
+
+  if (!workflowFile) {
+    dispatchErrorEl.hidden = false;
+    dispatchErrorEl.textContent = "Informe o arquivo do workflow (ex: ci.yml).";
+    return;
+  }
+  if (!ref) {
+    dispatchErrorEl.hidden = false;
+    dispatchErrorEl.textContent = "Informe a branch/tag (ref).";
+    return;
+  }
+
+  let inputs = {};
+  if (rawInputs) {
+    try {
+      inputs = JSON.parse(rawInputs);
+    } catch {
+      dispatchErrorEl.hidden = false;
+      dispatchErrorEl.textContent = "Inputs inválido — precisa ser um JSON válido (ou deixe vazio).";
+      return;
+    }
+  }
+
+  dispatchErrorEl.hidden = true;
+  dispatchSubmitBtn.disabled = true;
+  dispatchSubmitBtn.textContent = "Disparando…";
+  try {
+    const result = await window.api.dispatchWorkflow({
+      owner: dispatchTargetRepo.owner,
+      repo: dispatchTargetRepo.repo,
+      workflowFile,
+      ref,
+      inputs,
+    });
+    if (!result.ok) {
+      dispatchErrorEl.hidden = false;
+      dispatchErrorEl.textContent = `Falha ao disparar (status ${result.status})${result.error ? `: ${result.error}` : ""}`;
+      return;
+    }
+    closeDispatchModal();
+  } finally {
+    dispatchSubmitBtn.disabled = false;
+    dispatchSubmitBtn.textContent = "Disparar";
+  }
+});
+
+/* ---------- Drill-down de jobs/steps ---------- */
+
+async function toggleJobsPanel(jobsPanel, { owner, repo, runId }) {
+  const isOpen = jobsPanel.hidden;
+  if (!isOpen) {
+    jobsPanel.hidden = true;
+    return;
+  }
+
+  jobsPanel.hidden = false;
+  jobsPanel.innerHTML = "";
+  const loading = document.createElement("div");
+  loading.className = "jobs-loading";
+  loading.textContent = "Carregando jobs…";
+  jobsPanel.appendChild(loading);
+
+  const result = await window.api.getJobs({ owner, repo, runId });
+  jobsPanel.innerHTML = "";
+
+  if (!result.ok) {
+    const err = document.createElement("div");
+    err.className = "jobs-error";
+    err.textContent = `Erro ao carregar jobs (status ${result.status})${result.error ? `: ${result.error}` : ""}`;
+    jobsPanel.appendChild(err);
+    return;
+  }
+
+  if (result.jobs.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "jobs-loading";
+    empty.textContent = "Sem jobs pra essa run.";
+    jobsPanel.appendChild(empty);
+    return;
+  }
+
+  for (const job of result.jobs) {
+    const jobInfo = statusInfo({ status: job.status, conclusion: job.conclusion });
+    const jobRow = document.createElement("div");
+    jobRow.className = `job-row ${jobInfo.cls}`;
+    const jobBadge = document.createElement("span");
+    jobBadge.className = "status-icon-wrap";
+    jobBadge.innerHTML = STATUS_ICONS[jobInfo.cls] || STATUS_ICONS.unknown;
+    const jobName = document.createElement("span");
+    jobName.textContent = job.name;
+    jobRow.appendChild(jobBadge);
+    jobRow.appendChild(jobName);
+    jobsPanel.appendChild(jobRow);
+
+    for (const step of job.steps) {
+      const stepInfo = statusInfo({ status: step.status, conclusion: step.conclusion });
+      const stepRow = document.createElement("div");
+      stepRow.className = `step-row ${stepInfo.cls}`;
+      const stepBadge = document.createElement("span");
+      stepBadge.className = "status-icon-wrap";
+      stepBadge.innerHTML = STATUS_ICONS[stepInfo.cls] || STATUS_ICONS.unknown;
+      const stepName = document.createElement("span");
+      stepName.textContent = step.name;
+      stepRow.appendChild(stepBadge);
+      stepRow.appendChild(stepName);
+
+      if (stepInfo.cls === "failure") {
+        stepRow.classList.add("step-clickable");
+        stepRow.title = "Ver últimas linhas do log";
+        stepRow.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openLogModal({ owner, repo, jobId: job.id, jobName: job.name, stepName: step.name });
+        });
+      }
+      jobsPanel.appendChild(stepRow);
+    }
+  }
+}
 
 /* ---------- Tema claro/escuro ---------- */
 
@@ -404,10 +594,12 @@ function renderHistory(card, repo, recentRuns) {
       });
     }
 
-    if (run.htmlUrl) {
+    if (run.id) {
+      const jobsPanel = node.querySelector(".history-jobs");
+      row.title = "Clique pra ver jobs e steps";
       row.addEventListener("click", (e) => {
         e.stopPropagation();
-        window.api.openExternal(run.htmlUrl);
+        toggleJobsPanel(jobsPanel, { owner: repo.owner, repo: repo.repo, runId: run.id });
       });
     }
     historyEl.appendChild(node);
@@ -475,6 +667,11 @@ function renderDashboard() {
       });
     }
 
+    card.querySelector(".repo-card-dispatch-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openDispatchModal(repo);
+    });
+
     const runEl = card.querySelector(".repo-card-run");
     if (summary && !summary.error && !summary.empty) {
       runEl.textContent = `${summary.name || "workflow"} · ${summary.headBranch || ""} #${summary.runNumber ?? ""}`;
@@ -514,6 +711,16 @@ function renderDashboard() {
 
     repoCards.appendChild(node);
   }
+}
+
+function renderRateLimit(rateLimit) {
+  if (!rateLimit || !rateLimit.limit) {
+    rateLimitInfoEl.hidden = true;
+    return;
+  }
+  rateLimitInfoEl.hidden = false;
+  rateLimitInfoEl.textContent = `API: ${rateLimit.remaining}/${rateLimit.limit} requisições restantes`;
+  rateLimitInfoEl.classList.toggle("warn", rateLimit.remaining <= rateLimit.limit * 0.15);
 }
 
 /* ---------- Inicialização ---------- */
@@ -559,6 +766,12 @@ async function init() {
   }
   if (window.api.getVersion) {
     appVersionEl.textContent = `v${await window.api.getVersion()}`;
+  }
+  if (window.api.onRateLimit) {
+    window.api.onRateLimit(renderRateLimit);
+  }
+  if (window.api.getRateLimit) {
+    renderRateLimit(await window.api.getRateLimit());
   }
 }
 

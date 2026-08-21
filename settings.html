@@ -44,6 +44,7 @@
         </div>
         <div id="update-status" class="update-status" hidden></div>
         <button id="toggle-btn" class="toggle-btn">Iniciar</button>
+        <div id="rate-limit-info" class="rate-limit-info" hidden></div>
         <div id="app-version" class="app-version"></div>
       </div>
     </nav>
@@ -91,7 +92,7 @@
             </div>
             <p class="hint">
               Precisa de <code>repo</code> em token classic, ou permissão "Actions: Read and
-              write" em fine-grained (o "write" é usado pelos botões de re-executar e cancelar).
+              write" em fine-grained (o "write" é usado por re-executar, cancelar e disparar workflows).
             </p>
           </div>
 
@@ -178,6 +179,9 @@
             <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
           </button>
         </div>
+        <button class="repo-card-dispatch-btn" type="button" title="Disparar workflow manualmente">
+          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        </button>
         <button class="repo-card-expand" type="button" title="Ver últimas execuções">
           <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
@@ -189,23 +193,70 @@
   </template>
 
   <template id="history-row-template">
-    <div class="history-row">
-      <span class="history-badge"></span>
-      <span class="history-info"></span>
-      <div class="history-quick-actions">
-        <button class="history-open-btn" type="button" title="Abrir no navegador" hidden>
-          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </button>
-        <button class="history-cancel-btn" type="button" title="Cancelar execução" hidden>
-          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        </button>
-        <button class="history-rerun-btn" type="button" title="Re-executar" hidden>
-          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        </button>
+    <div class="history-entry">
+      <div class="history-row">
+        <span class="history-badge"></span>
+        <span class="history-info"></span>
+        <div class="history-quick-actions">
+          <button class="history-open-btn" type="button" title="Abrir no navegador" hidden>
+            <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
+          <button class="history-cancel-btn" type="button" title="Cancelar execução" hidden>
+            <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          </button>
+          <button class="history-rerun-btn" type="button" title="Re-executar" hidden>
+            <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          </button>
+        </div>
+        <span class="history-time"></span>
       </div>
-      <span class="history-time"></span>
+      <div class="history-jobs" hidden></div>
     </div>
   </template>
+
+  <div id="log-modal" class="app-modal" hidden>
+    <div class="app-modal-backdrop"></div>
+    <div class="app-modal-box">
+      <div class="app-modal-header">
+        <span id="log-modal-title"></span>
+        <button id="log-modal-close" type="button" title="Fechar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p id="log-modal-note" class="app-modal-note" hidden></p>
+      <pre id="log-modal-content" class="log-modal-content"></pre>
+    </div>
+  </div>
+
+  <div id="dispatch-modal" class="app-modal" hidden>
+    <div class="app-modal-backdrop"></div>
+    <div class="app-modal-box">
+      <div class="app-modal-header">
+        <span>Disparar workflow</span>
+        <button id="dispatch-modal-close" type="button" title="Fechar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="dispatch-modal-body">
+        <div class="field">
+          <label for="dispatch-workflow-file">Arquivo do workflow</label>
+          <input type="text" id="dispatch-workflow-file" placeholder="ci.yml" />
+        </div>
+        <div class="field">
+          <label for="dispatch-ref">Branch/tag (ref)</label>
+          <input type="text" id="dispatch-ref" placeholder="main" />
+        </div>
+        <div class="field">
+          <label for="dispatch-inputs">Inputs (JSON, opcional)</label>
+          <textarea id="dispatch-inputs" rows="4" placeholder="{}"></textarea>
+        </div>
+        <p id="dispatch-error" class="dispatch-error" hidden></p>
+      </div>
+      <footer class="dispatch-modal-footer">
+        <button id="dispatch-submit-btn" type="button">Disparar</button>
+      </footer>
+    </div>
+  </div>
 
   <script src="settings.js"></script>
 </body>

@@ -1,6 +1,6 @@
 const { test, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-const { checkAll, rerunRun, cancelRun } = require("../watcher");
+const { checkAll, rerunRun, cancelRun, fetchJobs, fetchJobLog, extractStepLog, dispatchWorkflow } = require("../watcher");
 
 const originalFetch = global.fetch;
 
@@ -8,12 +8,13 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-function fakeResponse({ ok = true, status = 200, headers = {}, body = { workflow_runs: [] } } = {}) {
+function fakeResponse({ ok = true, status = 200, headers = {}, body = { workflow_runs: [] }, text } = {}) {
   return {
     ok,
     status,
     headers: { get: (key) => headers[key] ?? null },
     json: async () => body,
+    text: async () => (text !== undefined ? text : JSON.stringify(body)),
   };
 }
 
@@ -162,4 +163,104 @@ test("propaga erro somente se todos os workflows falharem", async () => {
   assert.equal(errors.length, 1);
   assert.equal(errors[0].repoKey, "a/b");
   assert.equal(errors[0].rateLimited, false);
+});
+
+test("fetchJobs retorna jobs e steps normalizados", async () => {
+  global.fetch = async () =>
+    fakeResponse({
+      body: {
+        jobs: [
+          {
+            id: 1,
+            name: "build",
+            status: "completed",
+            conclusion: "failure",
+            steps: [
+              { name: "Checkout", status: "completed", conclusion: "success", number: 1 },
+              { name: "Run tests", status: "completed", conclusion: "failure", number: 2 },
+            ],
+          },
+        ],
+      },
+    });
+
+  const result = await fetchJobs({ owner: "a", repo: "b", runId: 1 }, "token");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.jobs.length, 1);
+  assert.equal(result.jobs[0].name, "build");
+  assert.equal(result.jobs[0].steps[1].name, "Run tests");
+  assert.equal(result.jobs[0].steps[1].conclusion, "failure");
+});
+
+test("extractStepLog isola o trecho do passo pelos marcadores de group", () => {
+  const log = [
+    "2024-01-01T00:00:00Z ##[group]Checkout",
+    "cloning repo...",
+    "2024-01-01T00:00:01Z ##[endgroup]",
+    "2024-01-01T00:00:02Z ##[group]Run tests",
+    "line 1",
+    "line 2",
+    "FAIL: something broke",
+    "2024-01-01T00:00:03Z ##[endgroup]",
+  ].join("\n");
+
+  const { lines, isolated } = extractStepLog(log, "Run tests", 50);
+
+  assert.equal(isolated, true);
+  assert.deepEqual(lines, ["line 1", "line 2", "FAIL: something broke"]);
+});
+
+test("extractStepLog cai pro final do log inteiro quando não acha o marcador", () => {
+  const log = ["a", "b", "c"].join("\n");
+
+  const { lines, isolated } = extractStepLog(log, "Passo inexistente", 2);
+
+  assert.equal(isolated, false);
+  assert.deepEqual(lines, ["b", "c"]);
+});
+
+test("fetchJobLog isola o log do step quando stepName é informado", async () => {
+  const log = ["##[group]Run tests", "linha A", "linha B", "##[endgroup]"].join("\n");
+  global.fetch = async () => fakeResponse({ text: log });
+
+  const result = await fetchJobLog({ owner: "a", repo: "b", jobId: 1, stepName: "Run tests" }, "token");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.isolated, true);
+  assert.equal(result.log, "linha A\nlinha B");
+});
+
+test("dispatchWorkflow envia ref e inputs no corpo da requisição", async () => {
+  let calledUrl, calledBody, calledOpts;
+  global.fetch = async (url, opts) => {
+    calledUrl = url;
+    calledOpts = opts;
+    calledBody = JSON.parse(opts.body);
+    return fakeResponse({ status: 204, body: {} });
+  };
+
+  const result = await dispatchWorkflow(
+    { owner: "a", repo: "b", workflowFile: "ci.yml", ref: "main", inputs: { env: "prod" } },
+    "token"
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(calledUrl, "https://api.github.com/repos/a/b/actions/workflows/ci.yml/dispatches");
+  assert.equal(calledOpts.method, "POST");
+  assert.deepEqual(calledBody, { ref: "main", inputs: { env: "prod" } });
+});
+
+test("dispatchWorkflow retorna erro com a mensagem da API quando falha", async () => {
+  global.fetch = async () =>
+    fakeResponse({ ok: false, status: 404, body: { message: "Workflow não encontrado" } });
+
+  const result = await dispatchWorkflow(
+    { owner: "a", repo: "b", workflowFile: "ci.yml", ref: "main", inputs: {} },
+    "token"
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+  assert.equal(result.error, "Workflow não encontrado");
 });

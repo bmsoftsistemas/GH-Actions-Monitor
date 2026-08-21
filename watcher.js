@@ -243,4 +243,133 @@ async function cancelRun({ owner, repo, runId }, token) {
   return { ok: false, status: res.status, error: message };
 }
 
-module.exports = { checkAll, RateLimitError, rerunRun, cancelRun };
+/**
+ * Busca os jobs (e steps) de uma execução — usado no drill-down do
+ * dashboard pra mostrar qual passo especificamente falhou.
+ */
+async function fetchJobs({ owner, repo, runId }, token) {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  if (!res.ok) {
+    let message;
+    try {
+      message = (await res.json()).message;
+    } catch {
+      // sem corpo JSON
+    }
+    return { ok: false, status: res.status, error: message };
+  }
+
+  const data = await res.json();
+  const jobs = (data.jobs || []).map((job) => ({
+    id: job.id,
+    name: job.name,
+    status: job.status,
+    conclusion: job.conclusion,
+    steps: (job.steps || []).map((step) => ({
+      name: step.name,
+      status: step.status,
+      conclusion: step.conclusion,
+      number: step.number,
+    })),
+  }));
+  return { ok: true, jobs };
+}
+
+/**
+ * A API do GitHub só expõe o log completo de um job (todos os passos
+ * concatenados, cada um entre marcadores "##[group]<nome>"/"##[endgroup]").
+ * Não existe endpoint de log por step — então, quando `stepName` é
+ * informado, tentamos isolar o trecho daquele passo pelos marcadores; se não
+ * encontrar (nem todo passo usa esse formato), cai de volta pro final do log
+ * inteiro do job, sinalizando `isolated: false`.
+ */
+function extractStepLog(fullLogText, stepName, maxLines) {
+  const lines = fullLogText.split("\n");
+  const startIdx = lines.findIndex((l) => l.includes("##[group]") && l.includes(stepName));
+
+  if (startIdx === -1) {
+    return { lines: lines.filter(Boolean).slice(-maxLines), isolated: false };
+  }
+
+  let endIdx = lines.findIndex((l, i) => i > startIdx && l.includes("##[endgroup]"));
+  if (endIdx === -1) endIdx = lines.length;
+
+  const segment = lines.slice(startIdx + 1, endIdx).filter(Boolean);
+  return { lines: segment.slice(-maxLines), isolated: true };
+}
+
+async function fetchJobLog({ owner, repo, jobId, stepName }, token, maxLines = 50) {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  if (!res.ok) {
+    let message;
+    try {
+      message = (await res.json()).message;
+    } catch {
+      // sem corpo JSON
+    }
+    return { ok: false, status: res.status, error: message };
+  }
+
+  const text = await res.text();
+  const { lines, isolated } = stepName
+    ? extractStepLog(text, stepName, maxLines)
+    : { lines: text.split("\n").filter(Boolean).slice(-maxLines), isolated: false };
+
+  return { ok: true, log: lines.join("\n"), isolated };
+}
+
+/**
+ * Dispara manualmente um workflow (workflow_dispatch). `workflowFile` aceita
+ * o nome do arquivo (ex: "ci.yml") — a API do GitHub aceita tanto o ID
+ * numérico quanto o nome do arquivo nesse endpoint.
+ */
+async function dispatchWorkflow({ owner, repo, workflowFile, ref, inputs }, token) {
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ref, inputs: inputs || {} }),
+    }
+  );
+
+  if (res.ok) return { ok: true, status: res.status };
+
+  let message;
+  try {
+    message = (await res.json()).message;
+  } catch {
+    // sem corpo JSON
+  }
+  return { ok: false, status: res.status, error: message };
+}
+
+module.exports = {
+  checkAll,
+  RateLimitError,
+  rerunRun,
+  cancelRun,
+  fetchJobs,
+  fetchJobLog,
+  extractStepLog,
+  dispatchWorkflow,
+};

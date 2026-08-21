@@ -2,7 +2,7 @@ const { app, Tray, Menu, BrowserWindow, Notification, ipcMain, shell, nativeImag
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const { loadConfig, saveConfig, loadRunState, saveRunState } = require("./store");
-const { checkAll, rerunRun, cancelRun } = require("./watcher");
+const { checkAll, rerunRun, cancelRun, fetchJobs, fetchJobLog, dispatchWorkflow } = require("./watcher");
 
 let tray = null;
 let settingsWindow = null;
@@ -11,6 +11,7 @@ let resumeTimer = null;
 let isRunning = false;
 let rateLimitedUntil = null;
 let lastSummaries = [];
+let lastRateLimit = null;
 let lastUpdateStatus = { state: "idle" };
 let updateReady = false;
 
@@ -55,6 +56,10 @@ async function pollOnce() {
     saveRunState(state);
     lastSummaries = result.summaries;
     pushSummaries();
+    if (result.rateLimit) {
+      lastRateLimit = result.rateLimit;
+      pushRateLimit();
+    }
 
     for (const { repoKey, run } of result.events) {
       const repoCfg = config.repos.find((r) => `${r.owner}/${r.repo}` === repoKey);
@@ -124,6 +129,12 @@ function formatClock(iso) {
 function pushSummaries() {
   if (settingsWindow) {
     settingsWindow.webContents.send("watcher:summaries", lastSummaries);
+  }
+}
+
+function pushRateLimit() {
+  if (settingsWindow) {
+    settingsWindow.webContents.send("watcher:rate-limit", lastRateLimit);
   }
 }
 
@@ -334,6 +345,23 @@ app.whenReady().then(() => {
     const config = loadConfig();
     return cancelRun({ owner, repo, runId }, config.token);
   });
+
+  ipcMain.handle("watcher:get-jobs", async (_event, { owner, repo, runId }) => {
+    const config = loadConfig();
+    return fetchJobs({ owner, repo, runId }, config.token);
+  });
+
+  ipcMain.handle("watcher:get-job-log", async (_event, { owner, repo, jobId, stepName }) => {
+    const config = loadConfig();
+    return fetchJobLog({ owner, repo, jobId, stepName }, config.token);
+  });
+
+  ipcMain.handle("watcher:dispatch-workflow", async (_event, { owner, repo, workflowFile, ref, inputs }) => {
+    const config = loadConfig();
+    return dispatchWorkflow({ owner, repo, workflowFile, ref, inputs }, config.token);
+  });
+
+  ipcMain.handle("watcher:get-rate-limit", () => lastRateLimit);
 
   ipcMain.handle("watcher:test-token", async (_event, { token, owner, repo }) => {
     try {

@@ -29,8 +29,8 @@ ainda) e coloca um ícone na bandeja do sistema.
 1. Cole seu **GitHub Token** (Settings → Developer settings → Personal
    access tokens, com escopo `repo` em token classic, ou permissão
    "Actions: Read and write" em fine-grained — o "and write" é necessário
-   para os botões de re-executar e cancelar workflow, não só para
-   monitorar).
+   para re-executar, cancelar e disparar workflows manualmente, não só
+   para monitorar).
 2. Adicione os repositórios (`owner` + `repo`). Opcionalmente, digite o
    nome de um ou mais arquivos de workflow (ex: `ci.yml`, Enter para
    adicionar cada um) para filtrar quais workflows monitorar — deixe vazio
@@ -48,8 +48,20 @@ ainda) e coloca um ícone na bandeja do sistema.
    Passe o mouse sobre um card (ou linha do histórico, no ▾) pra ver ações
    rápidas: abrir no navegador, cancelar (se estiver rodando) ou
    re-executar (se falhou) — sem precisar sair do app.
-6. Clique com o botão direito no ícone da bandeja para Iniciar/Parar,
+6. Clique numa linha do histórico (▾) para expandir os **jobs e steps**
+   daquela execução. Se um step falhou, clique nele pra ver as últimas 50
+   linhas do log direto no app (a API do GitHub só expõe o log inteiro do
+   job — o app tenta isolar só o trecho daquele step pelos marcadores do
+   log; quando não consegue, mostra um aviso e cai pro final do log
+   completo do job).
+7. Use o ícone ▶ no card para **disparar um workflow manualmente**
+   (`workflow_dispatch`) — informe o arquivo do workflow, a branch/tag e,
+   opcionalmente, inputs em JSON.
+8. Clique com o botão direito no ícone da bandeja para Iniciar/Parar,
    abrir Configurações ou Sair.
+
+O rodapé da janela mostra o consumo da cota da API do GitHub (ex: "API:
+4500/5000 requisições restantes"), ficando amarelo quando perto do limite.
 
 O ícone da bandeja muda de cor: cinza (parado), verde (rodando sem erro),
 vermelho (erro ao consultar algum repositório, ou limite de requisições da

@@ -8,6 +8,15 @@ contextBridge.exposeInMainWorld("api", {
   testToken: (payload) => ipcRenderer.invoke("watcher:test-token", payload),
   rerunRun: (payload) => ipcRenderer.invoke("watcher:rerun-run", payload),
   cancelRun: (payload) => ipcRenderer.invoke("watcher:cancel-run", payload),
+  getJobs: (payload) => ipcRenderer.invoke("watcher:get-jobs", payload),
+  getJobLog: (payload) => ipcRenderer.invoke("watcher:get-job-log", payload),
+  dispatchWorkflow: (payload) => ipcRenderer.invoke("watcher:dispatch-workflow", payload),
+  getRateLimit: () => ipcRenderer.invoke("watcher:get-rate-limit"),
+  onRateLimit: (callback) => {
+    const listener = (_event, rateLimit) => callback(rateLimit);
+    ipcRenderer.on("watcher:rate-limit", listener);
+    return () => ipcRenderer.removeListener("watcher:rate-limit", listener);
+  },
   getSummaries: () => ipcRenderer.invoke("watcher:get-summaries"),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   onSummaries: (callback) => {
