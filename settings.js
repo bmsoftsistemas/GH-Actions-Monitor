@@ -1,6 +1,6 @@
 const tokenInput = document.getElementById("token");
 const intervalInput = document.getElementById("interval");
-const intervalLabel = document.getElementById("interval-label");
+const pollSubtitle = document.getElementById("poll-subtitle");
 const startOnLoginInput = document.getElementById("start-on-login");
 const reposList = document.getElementById("repos-list");
 const repoRowTemplate = document.getElementById("repo-row-template");
@@ -206,11 +206,43 @@ async function refreshStatus() {
   applyStatus(isRunning);
 }
 
+let isWatcherRunning = false;
+let currentPollIntervalMs = 30000;
+let secondsUntilNextCheck = null;
+
+function renderPollSubtitle() {
+  if (!isWatcherRunning || secondsUntilNextCheck === null) {
+    pollSubtitle.textContent = "Monitoramento parado";
+  } else if (secondsUntilNextCheck <= 0) {
+    pollSubtitle.textContent = "Verificando…";
+  } else {
+    pollSubtitle.textContent = `Próxima verificação em ${secondsUntilNextCheck}s`;
+  }
+}
+
+function resetPollCountdown() {
+  secondsUntilNextCheck = Math.round(currentPollIntervalMs / 1000);
+  renderPollSubtitle();
+}
+
+setInterval(() => {
+  if (!isWatcherRunning || secondsUntilNextCheck === null || secondsUntilNextCheck <= 0) return;
+  secondsUntilNextCheck -= 1;
+  renderPollSubtitle();
+}, 1000);
+
 function applyStatus(isRunning) {
   statusDot.className = "dot " + (isRunning ? "running" : "idle");
   statusLabel.textContent = isRunning ? "Rodando" : "Parado";
   toggleBtn.textContent = isRunning ? "Parar" : "Iniciar";
   brandDot.className = "brand-dot " + (isRunning ? "running" : "");
+  isWatcherRunning = isRunning;
+  if (isRunning) {
+    resetPollCountdown();
+  } else {
+    secondsUntilNextCheck = null;
+    renderPollSubtitle();
+  }
 }
 
 addRepoBtn.addEventListener("click", () => addRepoRow());
@@ -243,7 +275,7 @@ saveBtn.addEventListener("click", async () => {
 
   await window.api.saveConfig(config);
   currentRepos = config.repos;
-  intervalLabel.textContent = `${Math.round(config.pollIntervalMs / 1000)}s`;
+  currentPollIntervalMs = config.pollIntervalMs;
   saveFeedback.textContent = "Salvo ✓";
   setTimeout(() => (saveFeedback.textContent = ""), 2000);
   renderDashboard();
@@ -408,7 +440,7 @@ async function init() {
   const config = await window.api.getConfig();
   tokenInput.value = config.token || "";
   intervalInput.value = Math.round((config.pollIntervalMs || 30000) / 1000);
-  intervalLabel.textContent = `${Math.round((config.pollIntervalMs || 30000) / 1000)}s`;
+  currentPollIntervalMs = config.pollIntervalMs || 30000;
   startOnLoginInput.checked = !!config.startOnLogin;
   currentRepos = config.repos;
 
@@ -428,6 +460,7 @@ async function init() {
   window.api.onSummaries((summaries) => {
     currentSummaries = summaries;
     renderDashboard();
+    if (isWatcherRunning) resetPollCountdown();
   });
   window.api.onStatusChanged(({ isRunning }) => applyStatus(isRunning));
 
