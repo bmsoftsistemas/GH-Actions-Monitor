@@ -227,7 +227,14 @@ function stopWatching() {
 
 function openSettingsWindow() {
   if (settingsWindow) {
+    if (settingsWindow.isMinimized()) settingsWindow.restore();
+    settingsWindow.show();
     settingsWindow.focus();
+    // Bug conhecido do Chromium no Windows: depois de minimizar/restaurar
+    // (ou trocar de app e voltar), o teclado às vezes não é roteado pro
+    // conteúdo web até um clique do mouse. Focar o webContents explicitamente
+    // evita isso.
+    settingsWindow.webContents.focus();
     return;
   }
   settingsWindow = new BrowserWindow({
@@ -248,6 +255,8 @@ function openSettingsWindow() {
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
+  settingsWindow.on("restore", () => settingsWindow.webContents.focus());
+  settingsWindow.on("focus", () => settingsWindow.webContents.focus());
 }
 
 function updateTrayMenu() {
