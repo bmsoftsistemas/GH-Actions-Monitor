@@ -27,20 +27,25 @@ ainda) e coloca um ícone na bandeja do sistema.
 ## 2. Uso
 
 1. Cole seu **GitHub Token** (Settings → Developer settings → Personal
-   access tokens, com escopo `repo` ou permissão de leitura em Actions).
+   access tokens, com escopo `repo` em token classic, ou permissão
+   "Actions: Read and write" em fine-grained — o "and write" é necessário
+   para o botão de re-executar workflow, não só para monitorar).
 2. Adicione os repositórios (`owner` + `repo`). Opcionalmente, digite o
    nome de um ou mais arquivos de workflow (ex: `ci.yml`, Enter para
    adicionar cada um) para filtrar quais workflows monitorar — deixe vazio
    para acompanhar todos.
-3. Use o botão 🔎 em cada linha para testar o acesso antes de salvar, e o
-   botão 🔔/🔕 para silenciar notificações daquele repo específico (ele
-   continua sendo monitorado e aparecendo no dashboard, só não dispara
-   toast).
+3. Use o ícone de lupa em cada linha para testar o acesso antes de salvar,
+   e o ícone de sino para silenciar notificações daquele repo específico
+   (ele continua sendo monitorado e aparecendo no dashboard, só não
+   dispara toast).
 4. Clique em **Salvar**. Se o monitoramento já estiver ligado, ele reinicia
    automaticamente com a nova configuração.
 5. Na aba **Monitoramento**, cada repositório aparece como um card
    (ordenado com falhas primeiro) — clique para abrir a run mais recente,
-   ou no ▾ para ver o histórico das últimas 5 execuções.
+   ou no ▾ para ver o histórico das últimas 5 execuções. Quando a run mais
+   recente (ou uma do histórico) falhou, aparece um ícone de re-executar
+   ao lado — dispara um novo run da mesma workflow sem precisar abrir o
+   navegador.
 6. Clique com o botão direito no ícone da bandeja para Iniciar/Parar,
    abrir Configurações ou Sair.
 
@@ -84,7 +89,7 @@ Os binários saem em `dist/`.
 ### Auto-update
 
 O app já vem com `electron-updater` integrado (checa por atualização ao
-iniciar e a cada 4h, baixa em segundo plano e avisa quando está pronta pra
+iniciar e a cada 5min, baixa em segundo plano e avisa quando está pronta pra
 instalar — pelo banner na janela, notificação do sistema, ou item no menu
 da bandeja). Isso só roda no app empacotado (`app.isPackaged`); em
 `npm start` fica inerte de propósito.

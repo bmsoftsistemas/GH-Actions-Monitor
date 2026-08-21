@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("api", {
   getStatus: () => ipcRenderer.invoke("watcher:status"),
   toggle: () => ipcRenderer.invoke("watcher:toggle"),
   testToken: (payload) => ipcRenderer.invoke("watcher:test-token", payload),
+  rerunRun: (payload) => ipcRenderer.invoke("watcher:rerun-run", payload),
   getSummaries: () => ipcRenderer.invoke("watcher:get-summaries"),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   onSummaries: (callback) => {

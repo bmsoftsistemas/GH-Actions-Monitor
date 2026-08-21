@@ -1,6 +1,6 @@
 const { test, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-const { checkAll } = require("../watcher");
+const { checkAll, rerunRun } = require("../watcher");
 
 const originalFetch = global.fetch;
 
@@ -97,6 +97,33 @@ test("mescla resultados quando 1 de 2 workflows falha (não rate limit)", async 
   assert.equal(errors.length, 0);
   assert.equal(summaries[0].repoKey, "a/b");
   assert.equal(summaries[0].name, "CI");
+});
+
+test("rerunRun retorna ok quando a API responde com sucesso", async () => {
+  let calledUrl, calledOpts;
+  global.fetch = async (url, opts) => {
+    calledUrl = url;
+    calledOpts = opts;
+    return fakeResponse({ status: 201, body: {} });
+  };
+
+  const result = await rerunRun({ owner: "a", repo: "b", runId: 42 }, "token");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 201);
+  assert.equal(calledUrl, "https://api.github.com/repos/a/b/actions/runs/42/rerun");
+  assert.equal(calledOpts.method, "POST");
+});
+
+test("rerunRun retorna erro com a mensagem da API quando falha", async () => {
+  global.fetch = async () =>
+    fakeResponse({ ok: false, status: 403, body: { message: "Sem permissão de escrita" } });
+
+  const result = await rerunRun({ owner: "a", repo: "b", runId: 42 }, "token");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(result.error, "Sem permissão de escrita");
 });
 
 test("propaga erro somente se todos os workflows falharem", async () => {

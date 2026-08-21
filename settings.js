@@ -278,7 +278,19 @@ function historyRunLabel(run) {
   return `${run.name || "workflow"} · ${run.headBranch || ""} #${run.runNumber ?? ""}`;
 }
 
-function renderHistory(card, repoKey, recentRuns) {
+async function handleRerunClick(button, { owner, repo, runId }) {
+  button.disabled = true;
+  try {
+    const result = await window.api.rerunRun({ owner, repo, runId });
+    if (!result.ok) {
+      alert(`Falha ao re-executar (status ${result.status})${result.error ? `: ${result.error}` : ""}`);
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderHistory(card, repo, recentRuns) {
   const historyEl = card.querySelector(".repo-card-history");
   historyEl.innerHTML = "";
 
@@ -297,6 +309,16 @@ function renderHistory(card, repoKey, recentRuns) {
     row.querySelector(".history-badge").classList.add(info.cls);
     row.querySelector(".history-info").textContent = historyRunLabel(run);
     row.querySelector(".history-time").textContent = formatRelativeTime(run.updatedAt);
+
+    const rerunBtn = row.querySelector(".history-rerun-btn");
+    if (info.cls === "failure" && run.id) {
+      rerunBtn.hidden = false;
+      rerunBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleRerunClick(rerunBtn, { owner: repo.owner, repo: repo.repo, runId: run.id });
+      });
+    }
+
     if (run.htmlUrl) {
       row.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -328,6 +350,15 @@ function renderDashboard() {
     card.querySelector(".repo-card-name").textContent = repoKey;
     card.querySelector(".repo-card-muted-icon").hidden = !repo.muted;
 
+    const cardRerunBtn = card.querySelector(".repo-card-rerun-btn");
+    if (info.cls === "failure" && summary && summary.id) {
+      cardRerunBtn.hidden = false;
+      cardRerunBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleRerunClick(cardRerunBtn, { owner: repo.owner, repo: repo.repo, runId: summary.id });
+      });
+    }
+
     const runEl = card.querySelector(".repo-card-run");
     if (summary && !summary.error && !summary.empty) {
       runEl.textContent = `${summary.name || "workflow"} · ${summary.headBranch || ""} #${summary.runNumber ?? ""}`;
@@ -348,7 +379,7 @@ function renderDashboard() {
     metaEl.appendChild(pill);
     metaEl.appendChild(time);
 
-    renderHistory(card, repoKey, summary && summary.recentRuns);
+    renderHistory(card, repo, summary && summary.recentRuns);
     card.classList.toggle("expanded", expandedRepos.has(repoKey));
 
     card.querySelector(".repo-card-expand").addEventListener("click", (e) => {

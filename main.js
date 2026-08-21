@@ -2,7 +2,7 @@ const { app, Tray, Menu, BrowserWindow, Notification, ipcMain, shell, nativeImag
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const { loadConfig, saveConfig, loadRunState, saveRunState } = require("./store");
-const { checkAll } = require("./watcher");
+const { checkAll, rerunRun } = require("./watcher");
 
 let tray = null;
 let settingsWindow = null;
@@ -14,7 +14,7 @@ let lastSummaries = [];
 let lastUpdateStatus = { state: "idle" };
 let updateReady = false;
 
-const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 horas
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
 const ICONS = {
   idle: path.join(__dirname, "assets", "tray-idle.png"),
@@ -298,6 +298,11 @@ app.whenReady().then(() => {
 
   ipcMain.handle("update:install", () => {
     if (updateReady) autoUpdater.quitAndInstall();
+  });
+
+  ipcMain.handle("watcher:rerun-run", async (_event, { owner, repo, runId }) => {
+    const config = loadConfig();
+    return rerunRun({ owner, repo, runId }, config.token);
   });
 
   ipcMain.handle("watcher:test-token", async (_event, { token, owner, repo }) => {

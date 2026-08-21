@@ -152,6 +152,7 @@ async function checkAll(repos, token, state) {
         latest
           ? {
               repoKey,
+              id: latest.id,
               name: latest.name,
               status: latest.status,
               conclusion: latest.conclusion,
@@ -192,4 +193,29 @@ async function checkAll(repos, token, state) {
   return { state, events, errors, summaries, rateLimit };
 }
 
-module.exports = { checkAll, RateLimitError };
+/**
+ * Dispara um re-run completo de uma execução via API do GitHub. Requer que
+ * o token tenha permissão de escrita em Actions (não basta leitura).
+ */
+async function rerunRun({ owner, repo, runId }, token) {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/rerun`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  if (res.ok) return { ok: true, status: res.status };
+
+  let message;
+  try {
+    message = (await res.json()).message;
+  } catch {
+    // resposta sem corpo JSON — segue sem mensagem detalhada
+  }
+  return { ok: false, status: res.status, error: message };
+}
+
+module.exports = { checkAll, RateLimitError, rerunRun };

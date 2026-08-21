@@ -1,5 +1,10 @@
 * { box-sizing: border-box; }
 
+/* Especificidade de [hidden] (UA stylesheet) empata com seletores de classe
+   comuns — sem isso, qualquer regra de classe que fixe `display` (ex: os
+   botões de ícone abaixo, que usam inline-flex) vence e ignora o atributo. */
+[hidden] { display: none !important; }
+
 .icon {
   width: 14px;
   height: 14px;
@@ -245,6 +250,16 @@ body {
   opacity: 0.8;
 }
 
+.repo-card-rerun-btn {
+  background: transparent;
+  color: var(--text-faint);
+  padding: 3px 5px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.repo-card-rerun-btn:hover { background: var(--surface); color: var(--accent-hover); }
+
 .repo-card-expand {
   background: transparent;
   color: var(--text-faint);
@@ -320,6 +335,15 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.history-rerun-btn {
+  background: transparent;
+  color: var(--text-faint);
+  padding: 1px 4px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.history-rerun-btn:hover { background: var(--surface-hover); color: var(--accent-hover); }
 .history-time { color: var(--text-faint); flex-shrink: 0; }
 
 .empty-state {
