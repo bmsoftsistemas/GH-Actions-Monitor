@@ -263,10 +263,9 @@ app.whenReady().then(() => {
   updateTrayMenu();
 
   const config = loadConfig();
+  openSettingsWindow();
   if (config.token && config.repos.length > 0) {
     startWatching();
-  } else {
-    openSettingsWindow();
   }
 
   setupAutoUpdater();

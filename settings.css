@@ -1,5 +1,14 @@
 * { box-sizing: border-box; }
 
+.icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: -2px;
+}
+.icon-xs { width: 11px; height: 11px; }
+
 :root {
   --bg: #16171b;
   --bg-elevated: #1c1d23;
@@ -117,10 +126,12 @@ body {
 .theme-toggle-btn {
   background: transparent;
   color: var(--text-muted);
-  padding: 4px 6px;
-  font-size: 13px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
+.theme-toggle-btn .icon { width: 15px; height: 15px; vertical-align: 0; }
 .theme-toggle-btn:hover { background: var(--surface); color: var(--text); }
 
 .nav-items {
@@ -146,7 +157,8 @@ body {
 }
 .nav-item:hover { background: var(--bg-elevated-hover); color: var(--text); }
 .nav-item.active { background: var(--accent-soft); color: var(--accent-soft-text); }
-.nav-icon { font-size: 13px; }
+.nav-icon { display: inline-flex; }
+.nav-icon .icon { width: 15px; height: 15px; vertical-align: -3px; }
 
 .sidebar-footer {
   border-top: 1px solid var(--border);
@@ -227,7 +239,8 @@ body {
 }
 
 .repo-card-muted-icon {
-  font-size: 11px;
+  display: inline-flex;
+  color: var(--text-faint);
   flex-shrink: 0;
   opacity: 0.8;
 }
@@ -235,8 +248,9 @@ body {
 .repo-card-expand {
   background: transparent;
   color: var(--text-faint);
-  padding: 2px 4px;
-  font-size: 11px;
+  padding: 3px 5px;
+  display: inline-flex;
+  align-items: center;
   line-height: 1;
   transition: transform 0.15s;
   flex-shrink: 0;
@@ -388,6 +402,11 @@ button:hover { background: var(--accent-hover); }
   padding: 7px 10px;
   font-weight: 400;
 }
+.icon-btn, .test-repo-btn, .remove-repo-btn, .mute-repo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .icon-btn:hover, .test-repo-btn:hover, .ghost-btn:hover, .mute-repo-btn:hover { background: var(--surface-hover); }
 .remove-repo-btn { background: var(--danger-soft); color: var(--danger-text); }
 .remove-repo-btn:hover { background: var(--danger-soft-hover); }
@@ -441,7 +460,8 @@ button:hover { background: var(--accent-hover); }
   background: transparent;
   color: var(--text-faint);
   padding: 0 3px;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
 }
 .workflow-chip-remove:hover { color: var(--danger-text); background: transparent; }
 

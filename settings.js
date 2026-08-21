@@ -23,6 +23,14 @@ const updateBannerText = document.getElementById("update-banner-text");
 const updateBannerBtn = document.getElementById("update-banner-btn");
 const updateStatusEl = document.getElementById("update-status");
 
+const ICON_ATTRS = 'class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const ICONS = {
+  sun: `<svg ${ICON_ATTRS}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+  moon: `<svg ${ICON_ATTRS}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`,
+  bell: `<svg ${ICON_ATTRS}><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>`,
+  bellOff: `<svg ${ICON_ATTRS}><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
+};
+
 let currentRepos = [];
 let currentSummaries = [];
 const expandedRepos = new Set();
@@ -49,7 +57,7 @@ document.querySelectorAll("[data-view]").forEach((el) => {
 /* ---------- Tema claro/escuro ---------- */
 
 function applyThemeButton(theme) {
-  themeToggleBtn.textContent = theme === "light" ? "🌙" : "☀️";
+  themeToggleBtn.innerHTML = theme === "light" ? ICONS.moon : ICONS.sun;
   themeToggleBtn.title = theme === "light" ? "Mudar para tema escuro" : "Mudar para tema claro";
 }
 
@@ -148,7 +156,7 @@ function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: fals
   });
 
   function applyMuteVisual() {
-    muteBtn.textContent = muted ? "🔕" : "🔔";
+    muteBtn.innerHTML = muted ? ICONS.bellOff : ICONS.bell;
     muteBtn.classList.toggle("muted", muted);
     muteBtn.title = muted ? "Notificações silenciadas — clique para reativar" : "Silenciar notificações";
   }
