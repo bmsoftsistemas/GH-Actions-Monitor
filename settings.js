@@ -2,6 +2,7 @@ const tokenInput = document.getElementById("token");
 const intervalInput = document.getElementById("interval");
 const pollSubtitle = document.getElementById("poll-subtitle");
 const startOnLoginInput = document.getElementById("start-on-login");
+const soundEnabledInput = document.getElementById("sound-enabled");
 const reposList = document.getElementById("repos-list");
 const repoRowTemplate = document.getElementById("repo-row-template");
 const workflowChipTemplate = document.getElementById("workflow-chip-template");
@@ -40,6 +41,12 @@ const dispatchInputsInput = document.getElementById("dispatch-inputs");
 const dispatchErrorEl = document.getElementById("dispatch-error");
 const dispatchSubmitBtn = document.getElementById("dispatch-submit-btn");
 let dispatchTargetRepo = null;
+
+const dndToggleBtn = document.getElementById("dnd-toggle-btn");
+const dndLabel = document.getElementById("dnd-label");
+const dndMenu = document.getElementById("dnd-menu");
+const dndCancelBtn = document.getElementById("dnd-cancel-btn");
+let dndUntil = null;
 
 const ICON_ATTRS = 'class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
@@ -328,7 +335,7 @@ updateBannerBtn.addEventListener("click", () => window.api.installUpdate());
 
 /* ---------- Formulário de configurações ---------- */
 
-function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: false }) {
+function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: false, notifyMode: "all", mutedBranches: [] }) {
   const node = repoRowTemplate.content.cloneNode(true);
   const row = node.querySelector(".repo-row");
   row.querySelector(".repo-owner").value = repo.owner || "";
@@ -336,10 +343,41 @@ function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: fals
 
   let workflowFiles = Array.isArray(repo.workflowFiles) ? [...repo.workflowFiles] : [];
   let muted = !!repo.muted;
+  let mutedBranches = Array.isArray(repo.mutedBranches) ? [...repo.mutedBranches] : [];
 
   const chipsEl = row.querySelector(".workflow-chips");
   const workflowInput = row.querySelector(".workflow-input");
   const muteBtn = row.querySelector(".mute-repo-btn");
+  const notifySelect = row.querySelector(".notify-mode-select");
+  const branchChipsEl = row.querySelector(".muted-branches-chips");
+  const branchInput = row.querySelector(".muted-branches-input");
+
+  notifySelect.value = repo.notifyMode || "all";
+
+  function renderBranchChips() {
+    branchChipsEl.innerHTML = "";
+    for (const branch of mutedBranches) {
+      const chipNode = workflowChipTemplate.content.cloneNode(true);
+      chipNode.querySelector(".workflow-chip-label").textContent = branch;
+      chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
+        mutedBranches = mutedBranches.filter((existing) => existing !== branch);
+        renderBranchChips();
+      });
+      branchChipsEl.appendChild(chipNode);
+    }
+  }
+  renderBranchChips();
+
+  branchInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const value = branchInput.value.trim();
+    if (value && !mutedBranches.includes(value)) {
+      mutedBranches.push(value);
+      renderBranchChips();
+    }
+    branchInput.value = "";
+  });
 
   function renderChips() {
     chipsEl.innerHTML = "";
@@ -395,6 +433,8 @@ function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: fals
   // Lidos por collectRepos() na hora de salvar.
   row._getWorkflowFiles = () => workflowFiles;
   row._getMuted = () => muted;
+  row._getNotifyMode = () => notifySelect.value;
+  row._getMutedBranches = () => mutedBranches;
 
   reposList.appendChild(node);
 }
@@ -406,6 +446,8 @@ function collectRepos() {
       repo: row.querySelector(".repo-name").value.trim(),
       workflowFiles: row._getWorkflowFiles ? row._getWorkflowFiles() : [],
       muted: row._getMuted ? row._getMuted() : false,
+      notifyMode: row._getNotifyMode ? row._getNotifyMode() : "all",
+      mutedBranches: row._getMutedBranches ? row._getMutedBranches() : [],
     }))
     .filter((r) => r.owner && r.repo);
 }
@@ -435,10 +477,54 @@ function resetPollCountdown() {
 }
 
 setInterval(() => {
-  if (!isWatcherRunning || secondsUntilNextCheck === null || secondsUntilNextCheck <= 0) return;
-  secondsUntilNextCheck -= 1;
-  renderPollSubtitle();
+  if (isWatcherRunning && secondsUntilNextCheck !== null && secondsUntilNextCheck > 0) {
+    secondsUntilNextCheck -= 1;
+    renderPollSubtitle();
+  }
+  renderDndUI();
 }, 1000);
+
+/* ---------- Modo foco / não perturbe ---------- */
+
+function renderDndUI() {
+  const active = !!dndUntil && Date.now() < dndUntil;
+  dndToggleBtn.classList.toggle("active", active);
+  dndCancelBtn.hidden = !active;
+  if (active) {
+    const time = new Date(dndUntil).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    dndLabel.textContent = `Focado até ${time}`;
+  } else {
+    dndLabel.textContent = "Não perturbe";
+  }
+}
+
+dndToggleBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  dndMenu.hidden = !dndMenu.hidden;
+});
+
+document.addEventListener("click", (e) => {
+  if (!dndMenu.hidden && !dndMenu.contains(e.target) && e.target !== dndToggleBtn) {
+    dndMenu.hidden = true;
+  }
+});
+
+document.querySelectorAll(".dnd-option").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const raw = btn.dataset.duration;
+    const duration = raw === "tomorrow" ? "tomorrow" : Number(raw);
+    dndUntil = await window.api.setDnd(duration);
+    renderDndUI();
+    dndMenu.hidden = true;
+  });
+});
+
+dndCancelBtn.addEventListener("click", async () => {
+  await window.api.clearDnd();
+  dndUntil = null;
+  renderDndUI();
+  dndMenu.hidden = true;
+});
 
 function applyStatus(isRunning) {
   statusDot.className = "dot " + (isRunning ? "running" : "idle");
@@ -470,6 +556,7 @@ saveBtn.addEventListener("click", async () => {
     token: tokenInput.value.trim(),
     pollIntervalMs: Math.max(10, Number(intervalInput.value) || 30) * 1000,
     startOnLogin: startOnLoginInput.checked,
+    soundEnabled: soundEnabledInput.checked,
     repos: collectRepos(),
   };
 
@@ -731,6 +818,7 @@ async function init() {
   intervalInput.value = Math.round((config.pollIntervalMs || 30000) / 1000);
   currentPollIntervalMs = config.pollIntervalMs || 30000;
   startOnLoginInput.checked = !!config.startOnLogin;
+  soundEnabledInput.checked = config.soundEnabled !== false;
   currentRepos = config.repos;
 
   reposList.innerHTML = "";
@@ -772,6 +860,16 @@ async function init() {
   }
   if (window.api.getRateLimit) {
     renderRateLimit(await window.api.getRateLimit());
+  }
+  if (window.api.getDnd) {
+    dndUntil = await window.api.getDnd();
+    renderDndUI();
+  }
+  if (window.api.onDndStatus) {
+    window.api.onDndStatus((until) => {
+      dndUntil = until;
+      renderDndUI();
+    });
   }
 }
 

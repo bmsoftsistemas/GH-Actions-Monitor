@@ -17,6 +17,14 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("watcher:rate-limit", listener);
     return () => ipcRenderer.removeListener("watcher:rate-limit", listener);
   },
+  getDnd: () => ipcRenderer.invoke("dnd:get"),
+  setDnd: (duration) => ipcRenderer.invoke("dnd:set", duration),
+  clearDnd: () => ipcRenderer.invoke("dnd:clear"),
+  onDndStatus: (callback) => {
+    const listener = (_event, dndUntil) => callback(dndUntil);
+    ipcRenderer.on("dnd:status", listener);
+    return () => ipcRenderer.removeListener("dnd:status", listener);
+  },
   getSummaries: () => ipcRenderer.invoke("watcher:get-summaries"),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   onSummaries: (callback) => {

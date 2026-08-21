@@ -172,20 +172,32 @@ async function checkAll(repos, token, state) {
       const initKey = `__init:${repoKey}`;
       const isFirstCheck = !state[initKey];
 
-      for (const run of runs) {
+      // `runs` vem ordenado do mais novo pro mais antigo (fetchRuns); para
+      // rastrear a última conclusão "de verdade" (e assim detectar quando uma
+      // run marca a volta ao sucesso depois de uma falha — "fixed") precisamos
+      // andar em ordem cronológica.
+      const lastConclusionKey = `${repoKey}:lastConclusion`;
+      let lastConclusion = state[lastConclusionKey] ?? null;
+
+      for (const run of [...runs].reverse()) {
         const key = `${repoKey}:${run.id}`;
         const prev = state[key];
 
         if (run.status === "completed" && run.conclusion && !isFirstCheck) {
           const alreadyNotified = prev && prev.conclusion === run.conclusion;
           if (!alreadyNotified) {
-            events.push({ repoKey, run });
+            const isFixed = run.conclusion === "success" && lastConclusion === "failure";
+            events.push({ repoKey, run, isFixed });
           }
         }
 
         state[key] = { status: run.status, conclusion: run.conclusion };
+        if (run.status === "completed" && run.conclusion) {
+          lastConclusion = run.conclusion;
+        }
       }
 
+      state[lastConclusionKey] = lastConclusion;
       state[initKey] = true;
     })
   );

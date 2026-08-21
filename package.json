@@ -29,6 +29,9 @@
       "settings.html",
       "settings.js",
       "settings.css",
+      "audio.html",
+      "audio.js",
+      "audio-preload.js",
       "assets/**"
     ],
     "mac": {

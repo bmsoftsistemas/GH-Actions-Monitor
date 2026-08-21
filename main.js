@@ -6,6 +6,7 @@ const { checkAll, rerunRun, cancelRun, fetchJobs, fetchJobLog, dispatchWorkflow 
 
 let tray = null;
 let settingsWindow = null;
+let audioWindow = null;
 let pollTimer = null;
 let resumeTimer = null;
 let isRunning = false;
@@ -14,6 +15,7 @@ let lastSummaries = [];
 let lastRateLimit = null;
 let lastUpdateStatus = { state: "idle" };
 let updateReady = false;
+let dndUntil = null;
 
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
@@ -27,15 +29,51 @@ function trayIcon(name) {
   return nativeImage.createFromPath(ICONS[name]).resize({ width: 16, height: 16 });
 }
 
-function notifyRunResult(repoKey, run) {
+function notifyRunResult(repoKey, run, isFixed) {
   const ok = run.conclusion === "success";
+  const title = isFixed ? `✅ ${repoKey} voltou a passar` : ok ? `✅ ${repoKey} passou` : `❌ ${repoKey} falhou`;
   const n = new Notification({
-    title: ok ? `✅ ${repoKey} passou` : `❌ ${repoKey} falhou`,
+    title,
     body: `${run.name} — ${run.head_branch} (#${run.run_number})`,
     silent: false,
   });
   n.on("click", () => shell.openExternal(run.html_url));
   n.show();
+}
+
+/**
+ * Decide se um evento de run concluída deve virar notificação, combinando
+ * mute total, branches silenciadas e a granularidade escolhida (all /
+ * failure-only / failure-and-fixed).
+ */
+function shouldNotify(repoCfg, run, isFixed) {
+  if (!repoCfg || repoCfg.muted) return false;
+  if (repoCfg.mutedBranches && repoCfg.mutedBranches.includes(run.head_branch)) return false;
+
+  const isFailure = run.conclusion === "failure";
+  switch (repoCfg.notifyMode) {
+    case "failure-only":
+      return isFailure;
+    case "failure-and-fixed":
+      return isFailure || isFixed;
+    default:
+      return true;
+  }
+}
+
+function isDndActive() {
+  return dndUntil !== null && Date.now() < dndUntil;
+}
+
+/**
+ * Toca um bipe curto sintetizado via Web Audio numa janela oculta dedicada
+ * (não tem API de áudio no processo principal, e a janela de configurações
+ * pode estar fechada quando o evento acontece).
+ */
+function playSound(kind) {
+  const config = loadConfig();
+  if (!config.soundEnabled) return;
+  if (audioWindow) audioWindow.webContents.send("audio:play", kind);
 }
 
 async function pollOnce() {
@@ -61,11 +99,11 @@ async function pollOnce() {
       pushRateLimit();
     }
 
-    for (const { repoKey, run } of result.events) {
+    for (const { repoKey, run, isFixed } of result.events) {
       const repoCfg = config.repos.find((r) => `${r.owner}/${r.repo}` === repoKey);
-      if (!repoCfg || !repoCfg.muted) {
-        notifyRunResult(repoKey, run);
-      }
+      if (!shouldNotify(repoCfg, run, isFixed) || isDndActive()) continue;
+      notifyRunResult(repoKey, run, isFixed);
+      playSound(run.conclusion === "success" ? "success" : "failure");
     }
 
     const rateLimitHit =
@@ -136,6 +174,30 @@ function pushRateLimit() {
   if (settingsWindow) {
     settingsWindow.webContents.send("watcher:rate-limit", lastRateLimit);
   }
+}
+
+function pushDndStatus() {
+  if (settingsWindow) {
+    settingsWindow.webContents.send("dnd:status", dndUntil);
+  }
+}
+
+function tomorrowMorning() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(8, 0, 0, 0);
+  return d.getTime();
+}
+
+function createAudioWindow() {
+  audioWindow = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "audio-preload.js"),
+      contextIsolation: true,
+    },
+  });
+  audioWindow.loadFile(path.join(__dirname, "audio.html"));
 }
 
 function pushStatus() {
@@ -300,6 +362,7 @@ app.whenReady().then(() => {
 
   const config = loadConfig();
   openSettingsWindow();
+  createAudioWindow();
   if (config.token && config.repos.length > 0) {
     startWatching();
   }
@@ -335,6 +398,19 @@ app.whenReady().then(() => {
   ipcMain.handle("update:install", () => installUpdate());
 
   ipcMain.handle("app:get-version", () => app.getVersion());
+
+  ipcMain.handle("dnd:get", () => dndUntil);
+
+  ipcMain.handle("dnd:set", (_event, duration) => {
+    dndUntil = duration === "tomorrow" ? tomorrowMorning() : Date.now() + duration;
+    pushDndStatus();
+    return dndUntil;
+  });
+
+  ipcMain.handle("dnd:clear", () => {
+    dndUntil = null;
+    pushDndStatus();
+  });
 
   ipcMain.handle("watcher:rerun-run", async (_event, { owner, repo, runId }) => {
     const config = loadConfig();

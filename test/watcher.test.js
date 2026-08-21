@@ -55,7 +55,35 @@ test("notifica quando um run em andamento termina, na segunda checagem em diante
   assert.equal(events.length, 1);
   assert.equal(events[0].repoKey, "a/b");
   assert.equal(events[0].run.conclusion, "success");
+  assert.equal(events[0].isFixed, false);
   assert.deepEqual(state["a/b:1"], { status: "completed", conclusion: "success" });
+});
+
+test("marca isFixed quando a run sucede logo depois de uma falha anterior", async () => {
+  global.fetch = async () => fakeResponse({ body: { workflow_runs: [run({ id: 2, conclusion: "success" })] } });
+
+  const initialState = {
+    "__init:a/b": true,
+    "a/b:lastConclusion": "failure",
+  };
+  const { events, state } = await checkAll([{ owner: "a", repo: "b", workflowFiles: [] }], "token", initialState);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].isFixed, true);
+  assert.equal(state["a/b:lastConclusion"], "success");
+});
+
+test("não marca isFixed quando a run anterior também tinha sucedido", async () => {
+  global.fetch = async () => fakeResponse({ body: { workflow_runs: [run({ id: 2, conclusion: "success" })] } });
+
+  const initialState = {
+    "__init:a/b": true,
+    "a/b:lastConclusion": "success",
+  };
+  const { events } = await checkAll([{ owner: "a", repo: "b", workflowFiles: [] }], "token", initialState);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].isFixed, false);
 });
 
 test("não notifica de novo a mesma conclusão já vista", async () => {

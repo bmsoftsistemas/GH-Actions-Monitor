@@ -5,15 +5,19 @@ const { app, safeStorage } = require("electron");
 const CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
 const STATE_PATH = path.join(app.getPath("userData"), "run-state.json");
 
+const NOTIFY_MODES = ["all", "failure-only", "failure-and-fixed"];
+
 const DEFAULT_CONFIG = {
   token: "",
   pollIntervalMs: 30000,
   startOnLogin: false,
-  repos: [], // [{ owner, repo, workflowFiles: string[], muted: boolean }]
+  soundEnabled: true,
+  repos: [], // [{ owner, repo, workflowFiles: string[], muted, notifyMode, mutedBranches }]
 };
 
 // Aceita repos salvos por versões antigas do app (campo `workflowFile`
-// singular, sem `muted`) e devolve sempre o formato atual.
+// singular, sem `muted`/`notifyMode`/`mutedBranches`) e devolve sempre o
+// formato atual.
 function normalizeRepo(repo) {
   const workflowFiles = Array.isArray(repo.workflowFiles)
     ? repo.workflowFiles
@@ -25,6 +29,8 @@ function normalizeRepo(repo) {
     repo: repo.repo,
     workflowFiles,
     muted: !!repo.muted,
+    notifyMode: NOTIFY_MODES.includes(repo.notifyMode) ? repo.notifyMode : "all",
+    mutedBranches: Array.isArray(repo.mutedBranches) ? repo.mutedBranches : [],
   };
 }
 

@@ -189,6 +189,50 @@ body {
 
 .toggle-btn { width: 100%; }
 
+.dnd-control { position: relative; }
+
+.dnd-toggle-btn {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.dnd-toggle-btn:hover { background: var(--surface-hover); }
+.dnd-toggle-btn .icon { width: 13px; height: 13px; flex-shrink: 0; }
+.dnd-toggle-btn.active { background: var(--warn-soft); color: var(--yellow); }
+
+.dnd-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.dnd-menu button {
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 400;
+  border-radius: 5px;
+}
+.dnd-menu button:hover { background: var(--surface-hover); }
+#dnd-cancel-btn { color: var(--danger-text); }
+
 /* ---------- Content ---------- */
 
 .content {
@@ -528,6 +572,30 @@ button:hover { background: var(--accent-hover); }
   align-items: center;
 }
 .workflow-chip-remove:hover { color: var(--danger-text); background: transparent; }
+
+.repo-row-notify, .repo-row-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--input-border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+select:focus { outline: none; border-color: var(--accent); }
+
+.muted-branches-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.muted-branches-chips:empty { display: none; }
 
 .settings-footer {
   display: flex;

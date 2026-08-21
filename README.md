@@ -36,9 +36,12 @@ ainda) e coloca um ícone na bandeja do sistema.
    adicionar cada um) para filtrar quais workflows monitorar — deixe vazio
    para acompanhar todos.
 3. Use o ícone de lupa em cada linha para testar o acesso antes de salvar,
-   e o ícone de sino para silenciar notificações daquele repo específico
-   (ele continua sendo monitorado e aparecendo no dashboard, só não
-   dispara toast).
+   e o ícone de sino pra silenciar completamente as notificações daquele
+   repo (continua monitorado e aparecendo no dashboard, só não dispara
+   toast). Pra um controle mais fino, use o seletor **"Notificar tudo /
+   Notificar só falhas / Falhas + quando voltar a passar"** e o campo de
+   branches pra silenciar notificações só de branches específicas (nome
+   exato, ex: `dev`) sem silenciar o repo inteiro.
 4. Clique em **Salvar**. Se o monitoramento já estiver ligado, ele reinicia
    automaticamente com a nova configuração.
 5. Na aba **Monitoramento**, cada repositório aparece como um card
@@ -62,6 +65,16 @@ ainda) e coloca um ícone na bandeja do sistema.
 
 O rodapé da janela mostra o consumo da cota da API do GitHub (ex: "API:
 4500/5000 requisições restantes"), ficando amarelo quando perto do limite.
+
+Em **Configurações**, "Tocar som ao concluir um build" ativa um bipe curto
+sintetizado (sem depender de nenhum arquivo de áudio) — sutil no sucesso,
+mais chamativo na falha. Esses sons e as notificações nativas respeitam o
+mute, a granularidade e as branches silenciadas de cada repo.
+
+O botão **"Não perturbe"** no rodapé da bandeja pausa notificações nativas
+e sons por 1h, 2h ou até amanhã (8h) — o monitoramento e o dashboard
+continuam normalmente, só a interrupção é silenciada enquanto o foco
+estiver ativo.
 
 O ícone da bandeja muda de cor: cinza (parado), verde (rodando sem erro),
 vermelho (erro ao consultar algum repositório, ou limite de requisições da
@@ -139,6 +152,7 @@ watcher.js                  # lógica de consulta à API do GitHub (reaproveitá
 store.js                    # persistência da config (token criptografado) e do estado de notificações já enviadas
 preload.js                  # ponte segura entre a janela de configurações e o main
 settings.html/.css/.js      # janela única com as telas de Monitoramento e Configurações
+audio.html/.js, audio-preload.js  # janela oculta que só sintetiza os bipes de som (Web Audio)
 assets/                     # ícones da bandeja e do app
 test/                       # testes de watcher.js (node:test, sem dependências extras)
 ```

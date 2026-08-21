@@ -43,6 +43,20 @@
           <span id="status-label">Parado</span>
         </div>
         <div id="update-status" class="update-status" hidden></div>
+
+        <div class="dnd-control">
+          <button id="dnd-toggle-btn" class="dnd-toggle-btn" type="button" title="Modo foco / não perturbe">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            <span id="dnd-label">Não perturbe</span>
+          </button>
+          <div id="dnd-menu" class="dnd-menu" hidden>
+            <button id="dnd-cancel-btn" type="button" hidden>Cancelar foco</button>
+            <button class="dnd-option" data-duration="3600000" type="button">Focar por 1 hora</button>
+            <button class="dnd-option" data-duration="7200000" type="button">Focar por 2 horas</button>
+            <button class="dnd-option" data-duration="tomorrow" type="button">Focar até amanhã</button>
+          </div>
+        </div>
+
         <button id="toggle-btn" class="toggle-btn">Iniciar</button>
         <div id="rate-limit-info" class="rate-limit-info" hidden></div>
         <div id="app-version" class="app-version"></div>
@@ -109,6 +123,13 @@
             </div>
           </div>
 
+          <div class="field field-checkbox">
+            <label class="checkbox-label">
+              <input type="checkbox" id="sound-enabled" />
+              Tocar som ao concluir um build (sutil no sucesso, mais chamativo na falha)
+            </label>
+          </div>
+
           <div class="field">
             <div class="repos-header">
               <label>Repositórios monitorados</label>
@@ -147,6 +168,17 @@
       <div class="repo-row-workflows">
         <div class="workflow-chips"></div>
         <input type="text" class="workflow-input" placeholder="workflow.yml (opcional — Enter para adicionar, vazio = todos)" />
+      </div>
+      <div class="repo-row-notify">
+        <select class="notify-mode-select" title="Granularidade das notificações">
+          <option value="all">Notificar tudo (sucesso e falha)</option>
+          <option value="failure-only">Notificar só falhas</option>
+          <option value="failure-and-fixed">Falhas + quando voltar a passar</option>
+        </select>
+      </div>
+      <div class="repo-row-branches">
+        <div class="muted-branches-chips"></div>
+        <input type="text" class="muted-branches-input" placeholder="branch pra silenciar (opcional — Enter para adicionar)" />
       </div>
     </div>
   </template>
