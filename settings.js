@@ -33,8 +33,17 @@ const ICONS = {
   bellOff: `<svg ${ICON_ATTRS}><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
 };
 
+// Ícones de status no estilo GitHub Actions (check-circle / x-circle / spinner).
+const STATUS_ICONS = {
+  success: `<svg class="icon status-icon" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16Zm3.78-9.72a.75.75 0 0 0-1.06-1.06L6.75 9.19 5.28 7.72a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l4.5-4.5Z"/></svg>`,
+  failure: `<svg class="icon status-icon" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2.343 13.657A8 8 0 1 1 13.657 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8l-1.97 1.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg>`,
+  progress: `<svg class="icon status-icon status-icon-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="8" cy="8" r="6" stroke-dasharray="22 100"/></svg>`,
+  unknown: `<svg class="icon status-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="5"/></svg>`,
+};
+
 let currentRepos = [];
 let currentSummaries = [];
+let currentFilter = "all";
 const expandedRepos = new Set();
 
 // Falhas primeiro, depois o que está rodando, depois desconhecido/aguardando,
@@ -54,6 +63,16 @@ function switchView(viewName) {
 
 document.querySelectorAll("[data-view]").forEach((el) => {
   el.addEventListener("click", () => switchView(el.dataset.view));
+});
+
+/* ---------- Filtro do dashboard ---------- */
+
+document.querySelectorAll(".filter-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    currentFilter = btn.dataset.filter;
+    document.querySelectorAll(".filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    renderDashboard();
+  });
 });
 
 /* ---------- Tema claro/escuro ---------- */
@@ -324,6 +343,18 @@ async function handleRerunClick(button, { owner, repo, runId }) {
   }
 }
 
+async function handleCancelClick(button, { owner, repo, runId }) {
+  button.disabled = true;
+  try {
+    const result = await window.api.cancelRun({ owner, repo, runId });
+    if (!result.ok) {
+      alert(`Falha ao cancelar (status ${result.status})${result.error ? `: ${result.error}` : ""}`);
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderHistory(card, repo, recentRuns) {
   const historyEl = card.querySelector(".repo-card-history");
   historyEl.innerHTML = "";
@@ -340,9 +371,29 @@ function renderHistory(card, repo, recentRuns) {
     const node = historyRowTemplate.content.cloneNode(true);
     const row = node.querySelector(".history-row");
     const info = statusInfo({ status: run.status, conclusion: run.conclusion });
-    row.querySelector(".history-badge").classList.add(info.cls);
+    const badge = row.querySelector(".history-badge");
+    badge.classList.add(info.cls);
+    badge.innerHTML = STATUS_ICONS[info.cls] || STATUS_ICONS.unknown;
     row.querySelector(".history-info").textContent = historyRunLabel(run);
     row.querySelector(".history-time").textContent = formatRelativeTime(run.updatedAt);
+
+    const openBtn = row.querySelector(".history-open-btn");
+    if (run.htmlUrl) {
+      openBtn.hidden = false;
+      openBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.api.openExternal(run.htmlUrl);
+      });
+    }
+
+    const cancelBtn = row.querySelector(".history-cancel-btn");
+    if (info.cls === "progress" && run.id) {
+      cancelBtn.hidden = false;
+      cancelBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleCancelClick(cancelBtn, { owner: repo.owner, repo: repo.repo, runId: run.id });
+      });
+    }
 
     const rerunBtn = row.querySelector(".history-rerun-btn");
     if (info.cls === "failure" && run.id) {
@@ -374,15 +425,46 @@ function renderDashboard() {
 
   rows.sort((a, b) => STATUS_PRIORITY[a.info.cls] - STATUS_PRIORITY[b.info.cls] || a.repoKey.localeCompare(b.repoKey));
 
-  repoCards.innerHTML = "";
-  emptyState.hidden = currentRepos.length > 0;
+  const visibleRows = currentFilter === "all" ? rows : rows.filter((r) => r.info.cls === currentFilter);
 
-  for (const { repo, repoKey, summary, info } of rows) {
+  repoCards.innerHTML = "";
+  emptyState.hidden = visibleRows.length > 0;
+  const emptyText = emptyState.querySelector("p");
+  const emptyLinkBtn = emptyState.querySelector(".link-btn");
+  if (currentRepos.length === 0) {
+    emptyText.textContent = "Nenhum repositório configurado ainda.";
+    emptyLinkBtn.hidden = false;
+  } else {
+    emptyText.textContent = "Nenhum repositório corresponde a esse filtro.";
+    emptyLinkBtn.hidden = true;
+  }
+
+  for (const { repo, repoKey, summary, info } of visibleRows) {
     const node = repoCardTemplate.content.cloneNode(true);
     const card = node.querySelector(".repo-card");
-    card.querySelector(".repo-card-badge").classList.add(info.cls);
+    const badge = card.querySelector(".repo-card-badge");
+    badge.classList.add(info.cls);
+    badge.innerHTML = STATUS_ICONS[info.cls] || STATUS_ICONS.unknown;
     card.querySelector(".repo-card-name").textContent = repoKey;
     card.querySelector(".repo-card-muted-icon").hidden = !repo.muted;
+
+    const openBtn = card.querySelector(".repo-card-open-btn");
+    if (summary && summary.htmlUrl) {
+      openBtn.hidden = false;
+      openBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.api.openExternal(summary.htmlUrl);
+      });
+    }
+
+    const cancelBtn = card.querySelector(".repo-card-cancel-btn");
+    if (info.cls === "progress" && summary && summary.id) {
+      cancelBtn.hidden = false;
+      cancelBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleCancelClick(cancelBtn, { owner: repo.owner, repo: repo.repo, runId: summary.id });
+      });
+    }
 
     const cardRerunBtn = card.querySelector(".repo-card-rerun-btn");
     if (info.cls === "failure" && summary && summary.id) {

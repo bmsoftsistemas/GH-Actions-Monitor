@@ -60,6 +60,12 @@
           <p class="subtitle" id="poll-subtitle">Monitoramento parado</p>
         </div>
 
+        <div class="dashboard-filters" id="dashboard-filters">
+          <button class="filter-btn active" data-filter="all" type="button">Todos</button>
+          <button class="filter-btn" data-filter="failure" type="button">Apenas falhas</button>
+          <button class="filter-btn" data-filter="progress" type="button">Rodando agora</button>
+        </div>
+
         <div id="repo-cards" class="repo-cards"></div>
 
         <div id="empty-state" class="empty-state" hidden>
@@ -85,7 +91,7 @@
             </div>
             <p class="hint">
               Precisa de <code>repo</code> em token classic, ou permissão "Actions: Read and
-              write" em fine-grained (o "write" é usado só pelo botão de re-executar).
+              write" em fine-grained (o "write" é usado pelos botões de re-executar e cancelar).
             </p>
           </div>
 
@@ -156,14 +162,22 @@
   <template id="repo-card-template">
     <div class="repo-card">
       <div class="repo-card-top">
-        <span class="repo-card-badge">●</span>
+        <span class="repo-card-badge"></span>
         <span class="repo-card-name"></span>
         <span class="repo-card-muted-icon" title="Notificações silenciadas" hidden>
           <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </span>
-        <button class="repo-card-rerun-btn" type="button" title="Re-executar workflow" hidden>
-          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        </button>
+        <div class="repo-card-quick-actions">
+          <button class="repo-card-open-btn" type="button" title="Abrir no navegador" hidden>
+            <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
+          <button class="repo-card-cancel-btn" type="button" title="Cancelar execução" hidden>
+            <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          </button>
+          <button class="repo-card-rerun-btn" type="button" title="Re-executar workflow" hidden>
+            <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          </button>
+        </div>
         <button class="repo-card-expand" type="button" title="Ver últimas execuções">
           <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
@@ -176,11 +190,19 @@
 
   <template id="history-row-template">
     <div class="history-row">
-      <span class="history-badge">●</span>
+      <span class="history-badge"></span>
       <span class="history-info"></span>
-      <button class="history-rerun-btn" type="button" title="Re-executar" hidden>
-        <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-      </button>
+      <div class="history-quick-actions">
+        <button class="history-open-btn" type="button" title="Abrir no navegador" hidden>
+          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </button>
+        <button class="history-cancel-btn" type="button" title="Cancelar execução" hidden>
+          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
+        <button class="history-rerun-btn" type="button" title="Re-executar" hidden>
+          <svg class="icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+      </div>
       <span class="history-time"></span>
     </div>
   </template>

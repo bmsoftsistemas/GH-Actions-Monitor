@@ -204,6 +204,23 @@ body {
 .view-header h1 { font-size: 19px; margin: 0 0 4px; font-weight: 650; }
 .subtitle { margin: 0; color: var(--text-muted); font-size: 12.5px; }
 
+/* ---------- Filtros do dashboard ---------- */
+
+.dashboard-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.filter-btn {
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.filter-btn:hover { background: var(--surface-hover); color: var(--text); }
+.filter-btn.active { background: var(--accent-soft); color: var(--accent-soft-text); }
+
 /* ---------- Dashboard / repo cards ---------- */
 
 .repo-cards {
@@ -228,11 +245,31 @@ body {
   gap: 8px;
   margin-bottom: 8px;
 }
-.repo-card-badge { font-size: 10px; }
+.repo-card-badge { display: inline-flex; flex-shrink: 0; }
+.repo-card-badge .status-icon { width: 14px; height: 14px; }
 .repo-card-badge.success { color: var(--green); }
 .repo-card-badge.failure { color: var(--red); }
 .repo-card-badge.progress { color: var(--yellow); }
 .repo-card-badge.unknown { color: var(--gray); }
+
+.status-icon-spin { animation: status-spin 0.9s linear infinite; }
+@keyframes status-spin { to { transform: rotate(360deg); } }
+
+.repo-card-quick-actions, .history-quick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.repo-card-quick-actions button, .history-quick-actions button {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.repo-card:hover .repo-card-quick-actions button:not([hidden]),
+.history-row:hover .history-quick-actions button:not([hidden]) {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .repo-card-name {
   font-weight: 600;
@@ -250,7 +287,7 @@ body {
   opacity: 0.8;
 }
 
-.repo-card-rerun-btn {
+.repo-card-open-btn, .repo-card-cancel-btn, .repo-card-rerun-btn {
   background: transparent;
   color: var(--text-faint);
   padding: 3px 5px;
@@ -258,7 +295,8 @@ body {
   align-items: center;
   flex-shrink: 0;
 }
-.repo-card-rerun-btn:hover { background: var(--surface); color: var(--accent-hover); }
+.repo-card-open-btn:hover, .repo-card-rerun-btn:hover { background: var(--surface); color: var(--accent-hover); }
+.repo-card-cancel-btn:hover { background: var(--danger-soft); color: var(--danger-text); }
 
 .repo-card-expand {
   background: transparent;
@@ -323,7 +361,8 @@ body {
   margin: -2px -4px;
 }
 .history-row:hover { background: var(--bg-elevated-hover); }
-.history-badge { font-size: 8px; flex-shrink: 0; }
+.history-badge { display: inline-flex; flex-shrink: 0; }
+.history-badge .status-icon { width: 10px; height: 10px; }
 .history-badge.success { color: var(--green); }
 .history-badge.failure { color: var(--red); }
 .history-badge.progress { color: var(--yellow); }
@@ -335,7 +374,7 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.history-rerun-btn {
+.history-open-btn, .history-cancel-btn, .history-rerun-btn {
   background: transparent;
   color: var(--text-faint);
   padding: 1px 4px;
@@ -343,7 +382,8 @@ body {
   align-items: center;
   flex-shrink: 0;
 }
-.history-rerun-btn:hover { background: var(--surface-hover); color: var(--accent-hover); }
+.history-open-btn:hover, .history-rerun-btn:hover { background: var(--surface-hover); color: var(--accent-hover); }
+.history-cancel-btn:hover { background: var(--danger-soft); color: var(--danger-text); }
 .history-time { color: var(--text-faint); flex-shrink: 0; }
 
 .empty-state {

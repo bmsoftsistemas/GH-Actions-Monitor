@@ -218,4 +218,29 @@ async function rerunRun({ owner, repo, runId }, token) {
   return { ok: false, status: res.status, error: message };
 }
 
-module.exports = { checkAll, RateLimitError, rerunRun };
+/**
+ * Cancela uma execução em andamento/na fila via API do GitHub. Requer o
+ * mesmo escopo de escrita em Actions que o rerun.
+ */
+async function cancelRun({ owner, repo, runId }, token) {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/cancel`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  if (res.ok) return { ok: true, status: res.status };
+
+  let message;
+  try {
+    message = (await res.json()).message;
+  } catch {
+    // resposta sem corpo JSON — segue sem mensagem detalhada
+  }
+  return { ok: false, status: res.status, error: message };
+}
+
+module.exports = { checkAll, RateLimitError, rerunRun, cancelRun };

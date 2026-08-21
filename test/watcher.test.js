@@ -1,6 +1,6 @@
 const { test, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-const { checkAll, rerunRun } = require("../watcher");
+const { checkAll, rerunRun, cancelRun } = require("../watcher");
 
 const originalFetch = global.fetch;
 
@@ -120,6 +120,33 @@ test("rerunRun retorna erro com a mensagem da API quando falha", async () => {
     fakeResponse({ ok: false, status: 403, body: { message: "Sem permissão de escrita" } });
 
   const result = await rerunRun({ owner: "a", repo: "b", runId: 42 }, "token");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(result.error, "Sem permissão de escrita");
+});
+
+test("cancelRun retorna ok quando a API responde com sucesso", async () => {
+  let calledUrl, calledOpts;
+  global.fetch = async (url, opts) => {
+    calledUrl = url;
+    calledOpts = opts;
+    return fakeResponse({ status: 202, body: {} });
+  };
+
+  const result = await cancelRun({ owner: "a", repo: "b", runId: 42 }, "token");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 202);
+  assert.equal(calledUrl, "https://api.github.com/repos/a/b/actions/runs/42/cancel");
+  assert.equal(calledOpts.method, "POST");
+});
+
+test("cancelRun retorna erro com a mensagem da API quando falha", async () => {
+  global.fetch = async () =>
+    fakeResponse({ ok: false, status: 403, body: { message: "Sem permissão de escrita" } });
+
+  const result = await cancelRun({ owner: "a", repo: "b", runId: 42 }, "token");
 
   assert.equal(result.ok, false);
   assert.equal(result.status, 403);

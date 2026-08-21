@@ -2,7 +2,7 @@ const { app, Tray, Menu, BrowserWindow, Notification, ipcMain, shell, nativeImag
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const { loadConfig, saveConfig, loadRunState, saveRunState } = require("./store");
-const { checkAll, rerunRun } = require("./watcher");
+const { checkAll, rerunRun, cancelRun } = require("./watcher");
 
 let tray = null;
 let settingsWindow = null;
@@ -328,6 +328,11 @@ app.whenReady().then(() => {
   ipcMain.handle("watcher:rerun-run", async (_event, { owner, repo, runId }) => {
     const config = loadConfig();
     return rerunRun({ owner, repo, runId }, config.token);
+  });
+
+  ipcMain.handle("watcher:cancel-run", async (_event, { owner, repo, runId }) => {
+    const config = loadConfig();
+    return cancelRun({ owner, repo, runId }, config.token);
   });
 
   ipcMain.handle("watcher:test-token", async (_event, { token, owner, repo }) => {

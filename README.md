@@ -29,7 +29,8 @@ ainda) e coloca um ícone na bandeja do sistema.
 1. Cole seu **GitHub Token** (Settings → Developer settings → Personal
    access tokens, com escopo `repo` em token classic, ou permissão
    "Actions: Read and write" em fine-grained — o "and write" é necessário
-   para o botão de re-executar workflow, não só para monitorar).
+   para os botões de re-executar e cancelar workflow, não só para
+   monitorar).
 2. Adicione os repositórios (`owner` + `repo`). Opcionalmente, digite o
    nome de um ou mais arquivos de workflow (ex: `ci.yml`, Enter para
    adicionar cada um) para filtrar quais workflows monitorar — deixe vazio
@@ -41,11 +42,12 @@ ainda) e coloca um ícone na bandeja do sistema.
 4. Clique em **Salvar**. Se o monitoramento já estiver ligado, ele reinicia
    automaticamente com a nova configuração.
 5. Na aba **Monitoramento**, cada repositório aparece como um card
-   (ordenado com falhas primeiro) — clique para abrir a run mais recente,
-   ou no ▾ para ver o histórico das últimas 5 execuções. Quando a run mais
-   recente (ou uma do histórico) falhou, aparece um ícone de re-executar
-   ao lado — dispara um novo run da mesma workflow sem precisar abrir o
-   navegador.
+   (ordenado com falhas primeiro) — usa os mesmos ícones de status do
+   GitHub Actions (✓ verde, ✕ vermelho, spinner amarelo pra em andamento).
+   Use os botões **Todos / Apenas falhas / Rodando agora** para filtrar.
+   Passe o mouse sobre um card (ou linha do histórico, no ▾) pra ver ações
+   rápidas: abrir no navegador, cancelar (se estiver rodando) ou
+   re-executar (se falhou) — sem precisar sair do app.
 6. Clique com o botão direito no ícone da bandeja para Iniciar/Parar,
    abrir Configurações ou Sair.
 
