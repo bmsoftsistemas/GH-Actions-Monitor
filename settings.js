@@ -1,0 +1,401 @@
+const tokenInput = document.getElementById("token");
+const intervalInput = document.getElementById("interval");
+const intervalLabel = document.getElementById("interval-label");
+const startOnLoginInput = document.getElementById("start-on-login");
+const reposList = document.getElementById("repos-list");
+const repoRowTemplate = document.getElementById("repo-row-template");
+const workflowChipTemplate = document.getElementById("workflow-chip-template");
+const repoCardTemplate = document.getElementById("repo-card-template");
+const historyRowTemplate = document.getElementById("history-row-template");
+const addRepoBtn = document.getElementById("add-repo-btn");
+const saveBtn = document.getElementById("save-btn");
+const saveFeedback = document.getElementById("save-feedback");
+const toggleBtn = document.getElementById("toggle-btn");
+const statusDot = document.getElementById("status-dot");
+const statusLabel = document.getElementById("status-label");
+const brandDot = document.getElementById("brand-dot");
+const toggleTokenVisibility = document.getElementById("toggle-token-visibility");
+const repoCards = document.getElementById("repo-cards");
+const emptyState = document.getElementById("empty-state");
+const themeToggleBtn = document.getElementById("theme-toggle-btn");
+const updateBanner = document.getElementById("update-banner");
+const updateBannerText = document.getElementById("update-banner-text");
+const updateBannerBtn = document.getElementById("update-banner-btn");
+const updateStatusEl = document.getElementById("update-status");
+
+let currentRepos = [];
+let currentSummaries = [];
+const expandedRepos = new Set();
+
+// Falhas primeiro, depois o que está rodando, depois desconhecido/aguardando,
+// sucesso por último (é o que menos precisa de atenção).
+const STATUS_PRIORITY = { failure: 0, progress: 1, unknown: 2, success: 3 };
+
+/* ---------- Navegação entre views ---------- */
+
+function switchView(viewName) {
+  document.querySelectorAll(".view").forEach((el) => {
+    el.classList.toggle("active", el.id === `view-${viewName}`);
+  });
+  document.querySelectorAll(".nav-item[data-view]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.view === viewName);
+  });
+}
+
+document.querySelectorAll("[data-view]").forEach((el) => {
+  el.addEventListener("click", () => switchView(el.dataset.view));
+});
+
+/* ---------- Tema claro/escuro ---------- */
+
+function applyThemeButton(theme) {
+  themeToggleBtn.textContent = theme === "light" ? "🌙" : "☀️";
+  themeToggleBtn.title = theme === "light" ? "Mudar para tema escuro" : "Mudar para tema claro";
+}
+
+// O tema em si já foi aplicado por um script inline no <head> (evita flash);
+// aqui só sincronizamos o ícone do botão com o que já está ativo.
+applyThemeButton(document.documentElement.getAttribute("data-theme") || "dark");
+
+themeToggleBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  try {
+    localStorage.setItem("theme", next);
+  } catch (e) {
+    // localStorage indisponível (raro) — o tema so nao persiste entre sessões.
+  }
+  applyThemeButton(next);
+});
+
+/* ---------- Atualizações automáticas ---------- */
+
+function renderUpdateStatus(status) {
+  if (!status) return;
+
+  switch (status.state) {
+    case "checking":
+      updateStatusEl.hidden = false;
+      updateStatusEl.textContent = "Verificando atualizações…";
+      updateBanner.classList.remove("visible");
+      break;
+    case "available":
+      updateStatusEl.hidden = false;
+      updateStatusEl.textContent = `Baixando atualização ${status.version || ""}…`;
+      updateBanner.classList.remove("visible");
+      break;
+    case "not-available":
+      updateStatusEl.hidden = true;
+      updateBanner.classList.remove("visible");
+      break;
+    case "downloaded":
+      updateStatusEl.hidden = true;
+      updateBannerText.textContent = `Nova versão ${status.version || ""} pronta — reinicie para atualizar.`;
+      updateBanner.classList.add("visible");
+      break;
+    case "error":
+      updateStatusEl.hidden = false;
+      updateStatusEl.textContent = "Falha ao verificar atualização.";
+      updateBanner.classList.remove("visible");
+      break;
+    default:
+      updateStatusEl.hidden = true;
+      updateBanner.classList.remove("visible");
+  }
+}
+
+updateBannerBtn.addEventListener("click", () => window.api.installUpdate());
+
+/* ---------- Formulário de configurações ---------- */
+
+function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: false }) {
+  const node = repoRowTemplate.content.cloneNode(true);
+  const row = node.querySelector(".repo-row");
+  row.querySelector(".repo-owner").value = repo.owner || "";
+  row.querySelector(".repo-name").value = repo.repo || "";
+
+  let workflowFiles = Array.isArray(repo.workflowFiles) ? [...repo.workflowFiles] : [];
+  let muted = !!repo.muted;
+
+  const chipsEl = row.querySelector(".workflow-chips");
+  const workflowInput = row.querySelector(".workflow-input");
+  const muteBtn = row.querySelector(".mute-repo-btn");
+
+  function renderChips() {
+    chipsEl.innerHTML = "";
+    for (const wf of workflowFiles) {
+      const chipNode = workflowChipTemplate.content.cloneNode(true);
+      chipNode.querySelector(".workflow-chip-label").textContent = wf;
+      chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
+        workflowFiles = workflowFiles.filter((existing) => existing !== wf);
+        renderChips();
+      });
+      chipsEl.appendChild(chipNode);
+    }
+  }
+  renderChips();
+
+  workflowInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const value = workflowInput.value.trim();
+    if (value && !workflowFiles.includes(value)) {
+      workflowFiles.push(value);
+      renderChips();
+    }
+    workflowInput.value = "";
+  });
+
+  function applyMuteVisual() {
+    muteBtn.textContent = muted ? "🔕" : "🔔";
+    muteBtn.classList.toggle("muted", muted);
+    muteBtn.title = muted ? "Notificações silenciadas — clique para reativar" : "Silenciar notificações";
+  }
+  applyMuteVisual();
+
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    applyMuteVisual();
+  });
+
+  row.querySelector(".remove-repo-btn").addEventListener("click", () => row.remove());
+
+  row.querySelector(".test-repo-btn").addEventListener("click", async () => {
+    const owner = row.querySelector(".repo-owner").value.trim();
+    const repoName = row.querySelector(".repo-name").value.trim();
+    const token = tokenInput.value.trim();
+    if (!owner || !repoName || !token) {
+      alert("Preencha token, owner e repositório antes de testar.");
+      return;
+    }
+    const result = await window.api.testToken({ token, owner, repo: repoName });
+    alert(result.ok ? "✅ Acesso OK!" : `❌ Falhou (status ${result.status})`);
+  });
+
+  // Lidos por collectRepos() na hora de salvar.
+  row._getWorkflowFiles = () => workflowFiles;
+  row._getMuted = () => muted;
+
+  reposList.appendChild(node);
+}
+
+function collectRepos() {
+  return Array.from(reposList.querySelectorAll(".repo-row"))
+    .map((row) => ({
+      owner: row.querySelector(".repo-owner").value.trim(),
+      repo: row.querySelector(".repo-name").value.trim(),
+      workflowFiles: row._getWorkflowFiles ? row._getWorkflowFiles() : [],
+      muted: row._getMuted ? row._getMuted() : false,
+    }))
+    .filter((r) => r.owner && r.repo);
+}
+
+async function refreshStatus() {
+  const { isRunning } = await window.api.getStatus();
+  applyStatus(isRunning);
+}
+
+function applyStatus(isRunning) {
+  statusDot.className = "dot " + (isRunning ? "running" : "idle");
+  statusLabel.textContent = isRunning ? "Rodando" : "Parado";
+  toggleBtn.textContent = isRunning ? "Parar" : "Iniciar";
+  brandDot.className = "brand-dot " + (isRunning ? "running" : "");
+}
+
+addRepoBtn.addEventListener("click", () => addRepoRow());
+
+toggleTokenVisibility.addEventListener("click", () => {
+  tokenInput.type = tokenInput.type === "password" ? "text" : "password";
+});
+
+toggleBtn.addEventListener("click", async () => {
+  const { isRunning } = await window.api.toggle();
+  applyStatus(isRunning);
+});
+
+saveBtn.addEventListener("click", async () => {
+  const config = {
+    token: tokenInput.value.trim(),
+    pollIntervalMs: Math.max(10, Number(intervalInput.value) || 30) * 1000,
+    startOnLogin: startOnLoginInput.checked,
+    repos: collectRepos(),
+  };
+
+  if (!config.token) {
+    alert("Informe o GitHub Token.");
+    return;
+  }
+  if (config.repos.length === 0) {
+    alert("Adicione ao menos um repositório.");
+    return;
+  }
+
+  await window.api.saveConfig(config);
+  currentRepos = config.repos;
+  intervalLabel.textContent = `${Math.round(config.pollIntervalMs / 1000)}s`;
+  saveFeedback.textContent = "Salvo ✓";
+  setTimeout(() => (saveFeedback.textContent = ""), 2000);
+  renderDashboard();
+  await refreshStatus();
+});
+
+/* ---------- Dashboard de monitoramento ---------- */
+
+function statusInfo(summary) {
+  if (!summary) return { cls: "unknown", label: "Aguardando checagem" };
+  if (summary.error) return { cls: "failure", label: "Erro ao consultar" };
+  if (summary.empty) return { cls: "unknown", label: "Sem execuções" };
+  if (summary.status !== "completed") {
+    return { cls: "progress", label: summary.status === "queued" ? "Na fila" : "Em execução" };
+  }
+  if (summary.conclusion === "success") return { cls: "success", label: "Sucesso" };
+  if (summary.conclusion === "failure") return { cls: "failure", label: "Falhou" };
+  return { cls: "unknown", label: summary.conclusion || "Desconhecido" };
+}
+
+function formatRelativeTime(iso) {
+  if (!iso) return "";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "agora mesmo";
+  if (mins < 60) return `há ${mins} min`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.round(hours / 24);
+  return `há ${days}d`;
+}
+
+function historyRunLabel(run) {
+  return `${run.name || "workflow"} · ${run.headBranch || ""} #${run.runNumber ?? ""}`;
+}
+
+function renderHistory(card, repoKey, recentRuns) {
+  const historyEl = card.querySelector(".repo-card-history");
+  historyEl.innerHTML = "";
+
+  if (!recentRuns || recentRuns.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "history-row";
+    empty.textContent = "Sem execuções recentes.";
+    historyEl.appendChild(empty);
+    return;
+  }
+
+  for (const run of recentRuns) {
+    const node = historyRowTemplate.content.cloneNode(true);
+    const row = node.querySelector(".history-row");
+    const info = statusInfo({ status: run.status, conclusion: run.conclusion });
+    row.querySelector(".history-badge").classList.add(info.cls);
+    row.querySelector(".history-info").textContent = historyRunLabel(run);
+    row.querySelector(".history-time").textContent = formatRelativeTime(run.updatedAt);
+    if (run.htmlUrl) {
+      row.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.api.openExternal(run.htmlUrl);
+      });
+    }
+    historyEl.appendChild(node);
+  }
+}
+
+function renderDashboard() {
+  const summaryByRepo = new Map(currentSummaries.map((s) => [s.repoKey, s]));
+
+  const rows = currentRepos.map((repo) => {
+    const repoKey = `${repo.owner}/${repo.repo}`;
+    const summary = summaryByRepo.get(repoKey);
+    return { repo, repoKey, summary, info: statusInfo(summary) };
+  });
+
+  rows.sort((a, b) => STATUS_PRIORITY[a.info.cls] - STATUS_PRIORITY[b.info.cls] || a.repoKey.localeCompare(b.repoKey));
+
+  repoCards.innerHTML = "";
+  emptyState.hidden = currentRepos.length > 0;
+
+  for (const { repo, repoKey, summary, info } of rows) {
+    const node = repoCardTemplate.content.cloneNode(true);
+    const card = node.querySelector(".repo-card");
+    card.querySelector(".repo-card-badge").classList.add(info.cls);
+    card.querySelector(".repo-card-name").textContent = repoKey;
+    card.querySelector(".repo-card-muted-icon").hidden = !repo.muted;
+
+    const runEl = card.querySelector(".repo-card-run");
+    if (summary && !summary.error && !summary.empty) {
+      runEl.textContent = `${summary.name || "workflow"} · ${summary.headBranch || ""} #${summary.runNumber ?? ""}`;
+    } else if (summary && summary.error) {
+      runEl.textContent = summary.error;
+    } else if (repo.workflowFiles && repo.workflowFiles.length > 0) {
+      runEl.textContent = `workflows: ${repo.workflowFiles.join(", ")}`;
+    } else {
+      runEl.textContent = "—";
+    }
+
+    const metaEl = card.querySelector(".repo-card-meta");
+    const pill = document.createElement("span");
+    pill.className = `status-pill ${info.cls}`;
+    pill.textContent = info.label;
+    const time = document.createElement("span");
+    time.textContent = summary && summary.updatedAt ? formatRelativeTime(summary.updatedAt) : "";
+    metaEl.appendChild(pill);
+    metaEl.appendChild(time);
+
+    renderHistory(card, repoKey, summary && summary.recentRuns);
+    card.classList.toggle("expanded", expandedRepos.has(repoKey));
+
+    card.querySelector(".repo-card-expand").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (expandedRepos.has(repoKey)) {
+        expandedRepos.delete(repoKey);
+      } else {
+        expandedRepos.add(repoKey);
+      }
+      card.classList.toggle("expanded", expandedRepos.has(repoKey));
+    });
+
+    if (summary && summary.htmlUrl) {
+      card.addEventListener("click", () => window.api.openExternal(summary.htmlUrl));
+    }
+
+    repoCards.appendChild(node);
+  }
+}
+
+/* ---------- Inicialização ---------- */
+
+async function init() {
+  const config = await window.api.getConfig();
+  tokenInput.value = config.token || "";
+  intervalInput.value = Math.round((config.pollIntervalMs || 30000) / 1000);
+  intervalLabel.textContent = `${Math.round((config.pollIntervalMs || 30000) / 1000)}s`;
+  startOnLoginInput.checked = !!config.startOnLogin;
+  currentRepos = config.repos;
+
+  reposList.innerHTML = "";
+  if (config.repos.length === 0) {
+    addRepoRow();
+    switchView("settings");
+  } else {
+    config.repos.forEach(addRepoRow);
+  }
+
+  currentSummaries = await window.api.getSummaries();
+  renderDashboard();
+
+  await refreshStatus();
+
+  window.api.onSummaries((summaries) => {
+    currentSummaries = summaries;
+    renderDashboard();
+  });
+  window.api.onStatusChanged(({ isRunning }) => applyStatus(isRunning));
+
+  if (window.api.onUpdateStatus) {
+    window.api.onUpdateStatus(renderUpdateStatus);
+  }
+  if (window.api.getUpdateStatus) {
+    renderUpdateStatus(await window.api.getUpdateStatus());
+  }
+}
+
+init();

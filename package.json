@@ -1,0 +1,49 @@
+{
+  "name": "gh-actions-watcher-gui",
+  "version": "1.0.0",
+  "description": "App de bandeja para monitorar GitHub Actions e mostrar toasts, com GUI de configuração",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.example.ghactionswatcher",
+    "productName": "GH Actions Watcher",
+    "publish": {
+      "provider": "github",
+      "owner": "bmsoftsistemas",
+      "repo": "GH-Actions-Monitor"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "store.js",
+      "watcher.js",
+      "settings.html",
+      "settings.js",
+      "settings.css",
+      "assets/**"
+    ],
+    "mac": {
+      "icon": "assets/icon.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": [
+        "AppImage"
+      ]
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<title>GH Actions Watcher</title>
+<script>
+  // Aplica o tema salvo antes da primeira renderização, pra evitar flash
+  // do tema errado (FOUC) ao abrir a janela.
+  (function () {
+    try {
+      var theme = localStorage.getItem("theme") || "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div class="app">
+    <nav class="sidebar">
+      <div class="brand">
+        <span class="brand-dot" id="brand-dot"></span>
+        <span class="brand-name">GH Actions<br />Watcher</span>
+        <button id="theme-toggle-btn" class="theme-toggle-btn" type="button" title="Alternar tema">🌙</button>
+      </div>
+
+      <div class="nav-items">
+        <button class="nav-item active" data-view="dashboard" type="button">
+          <span class="nav-icon">📊</span> Monitoramento
+        </button>
+        <button class="nav-item" data-view="settings" type="button">
+          <span class="nav-icon">⚙</span> Configurações
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="status-line">
+          <span id="status-dot" class="dot idle"></span>
+          <span id="status-label">Parado</span>
+        </div>
+        <div id="update-status" class="update-status" hidden></div>
+        <button id="toggle-btn" class="toggle-btn">Iniciar</button>
+      </div>
+    </nav>
+
+    <main class="content">
+      <section id="view-dashboard" class="view active">
+        <div id="update-banner" class="update-banner">
+          <span id="update-banner-text"></span>
+          <button id="update-banner-btn" type="button">Reiniciar e atualizar</button>
+        </div>
+
+        <div class="view-header">
+          <h1>Monitoramento</h1>
+          <p class="subtitle">
+            Checando a cada <span id="interval-label">30s</span>
+          </p>
+        </div>
+
+        <div id="repo-cards" class="repo-cards"></div>
+
+        <div id="empty-state" class="empty-state" hidden>
+          <p>Nenhum repositório configurado ainda.</p>
+          <button class="link-btn" data-view="settings" type="button">Ir para Configurações →</button>
+        </div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <div class="view-header">
+          <h1>Configurações</h1>
+          <p class="subtitle">Token, intervalo e repositórios monitorados</p>
+        </div>
+
+        <div class="settings-body">
+          <div class="field">
+            <label for="token">GitHub Token (Personal Access Token)</label>
+            <div class="row">
+              <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" />
+              <button id="toggle-token-visibility" class="icon-btn" type="button">👁</button>
+            </div>
+            <p class="hint">
+              Precisa de escopo de leitura em Actions (<code>repo</code> em token classic, ou
+              permissão "Actions: Read-only" em fine-grained).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="interval">Intervalo de checagem (segundos)</label>
+              <input type="number" id="interval" min="10" value="30" />
+            </div>
+            <div class="field field-checkbox">
+              <label class="checkbox-label">
+                <input type="checkbox" id="start-on-login" />
+                Iniciar automaticamente ao ligar o computador
+              </label>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="repos-header">
+              <label>Repositórios monitorados</label>
+              <button id="add-repo-btn" class="ghost-btn" type="button">+ Adicionar</button>
+            </div>
+            <div id="repos-list"></div>
+          </div>
+        </div>
+
+        <footer class="settings-footer">
+          <span id="save-feedback"></span>
+          <button id="save-btn">Salvar</button>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <template id="repo-row-template">
+    <div class="repo-row">
+      <div class="repo-row-main">
+        <input type="text" class="repo-owner" placeholder="owner (ex: minha-org)" />
+        <input type="text" class="repo-name" placeholder="repositorio" />
+        <button class="mute-repo-btn" type="button" title="Silenciar notificações">🔔</button>
+        <button class="test-repo-btn" type="button" title="Testar acesso">🔎</button>
+        <button class="remove-repo-btn" type="button" title="Remover">✕</button>
+      </div>
+      <div class="repo-row-workflows">
+        <div class="workflow-chips"></div>
+        <input type="text" class="workflow-input" placeholder="workflow.yml (opcional — Enter para adicionar, vazio = todos)" />
+      </div>
+    </div>
+  </template>
+
+  <template id="workflow-chip-template">
+    <span class="workflow-chip">
+      <span class="workflow-chip-label"></span>
+      <button class="workflow-chip-remove" type="button" title="Remover">✕</button>
+    </span>
+  </template>
+
+  <template id="repo-card-template">
+    <div class="repo-card">
+      <div class="repo-card-top">
+        <span class="repo-card-badge">●</span>
+        <span class="repo-card-name"></span>
+        <span class="repo-card-muted-icon" title="Notificações silenciadas" hidden>🔕</span>
+        <button class="repo-card-expand" type="button" title="Ver últimas execuções">▾</button>
+      </div>
+      <div class="repo-card-run"></div>
+      <div class="repo-card-meta"></div>
+      <div class="repo-card-history"></div>
+    </div>
+  </template>
+
+  <template id="history-row-template">
+    <div class="history-row">
+      <span class="history-badge">●</span>
+      <span class="history-info"></span>
+      <span class="history-time"></span>
+    </div>
+  </template>
+
+  <script src="settings.js"></script>
+</body>
+</html>
