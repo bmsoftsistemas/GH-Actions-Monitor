@@ -32,6 +32,7 @@ function normalizeRepo(repo) {
     notifyMode: NOTIFY_MODES.includes(repo.notifyMode) ? repo.notifyMode : "all",
     mutedBranches: Array.isArray(repo.mutedBranches) ? repo.mutedBranches : [],
     group: typeof repo.group === "string" ? repo.group.trim() : "",
+    tags: Array.isArray(repo.tags) ? repo.tags : [],
   };
 }
 
@@ -103,4 +104,4 @@ function saveRunState(state) {
   fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 }
 
-module.exports = { loadConfig, saveConfig, loadRunState, saveRunState, CONFIG_PATH };
+module.exports = { loadConfig, saveConfig, loadRunState, saveRunState, normalizeRepo, CONFIG_PATH };

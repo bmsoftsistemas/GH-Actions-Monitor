@@ -8,7 +8,7 @@ const tokenTestResultEl = document.getElementById("token-test-result");
 const exportConfigBtn = document.getElementById("export-config-btn");
 const importConfigBtn = document.getElementById("import-config-btn");
 const reposList = document.getElementById("repos-list");
-const repoRowTemplate = document.getElementById("repo-row-template");
+const repoSummaryRowTemplate = document.getElementById("repo-summary-row-template");
 const workflowChipTemplate = document.getElementById("workflow-chip-template");
 const repoCardTemplate = document.getElementById("repo-card-template");
 const historyRowTemplate = document.getElementById("history-row-template");
@@ -46,6 +46,28 @@ const dispatchErrorEl = document.getElementById("dispatch-error");
 const dispatchSubmitBtn = document.getElementById("dispatch-submit-btn");
 let dispatchTargetRepo = null;
 
+const repoEditModal = document.getElementById("repo-edit-modal");
+const repoEditModalTitle = document.getElementById("repo-edit-modal-title");
+const repoEditModalClose = document.getElementById("repo-edit-modal-close");
+const repoEditOwnerInput = document.getElementById("repo-edit-owner");
+const repoEditRepoInput = document.getElementById("repo-edit-repo");
+const repoEditGroupInput = document.getElementById("repo-edit-group");
+const repoEditTagsChipsEl = document.getElementById("repo-edit-tags-chips");
+const repoEditTagsInput = document.getElementById("repo-edit-tags-input");
+const repoEditWorkflowsChipsEl = document.getElementById("repo-edit-workflows-chips");
+const repoEditWorkflowsInput = document.getElementById("repo-edit-workflows-input");
+const repoEditNotifyModeSelect = document.getElementById("repo-edit-notify-mode");
+const repoEditBranchesChipsEl = document.getElementById("repo-edit-branches-chips");
+const repoEditBranchesInput = document.getElementById("repo-edit-branches-input");
+const repoEditMutedInput = document.getElementById("repo-edit-muted");
+const repoEditErrorEl = document.getElementById("repo-edit-error");
+const repoEditSaveBtn = document.getElementById("repo-edit-save-btn");
+let repoEditIndex = null;
+let repoEditIsNew = false;
+let repoEditWorkflowFiles = [];
+let repoEditMutedBranches = [];
+let repoEditTags = [];
+
 const dndToggleBtn = document.getElementById("dnd-toggle-btn");
 const dndLabel = document.getElementById("dnd-label");
 const dndMenu = document.getElementById("dnd-menu");
@@ -69,8 +91,10 @@ const STATUS_ICONS = {
 };
 
 let currentRepos = [];
+let draftRepos = [];
 let currentSummaries = [];
 let currentFilter = "all";
+let searchQuery = "";
 const expandedRepos = new Set();
 
 // Falhas primeiro, depois o que está rodando, depois desconhecido/aguardando,
@@ -101,6 +125,18 @@ document.querySelectorAll(".filter-btn").forEach((btn) => {
     renderDashboard();
   });
 });
+
+const dashboardSearchInput = document.getElementById("dashboard-search");
+dashboardSearchInput.addEventListener("input", () => {
+  searchQuery = dashboardSearchInput.value.trim().toLowerCase();
+  renderDashboard();
+});
+
+function matchesSearch(repo) {
+  if (!searchQuery) return true;
+  const haystacks = [repo.owner, repo.repo, repo.group, ...(repo.tags || [])];
+  return haystacks.some((h) => h && h.toLowerCase().includes(searchQuery));
+}
 
 /* ---------- Modal de log ---------- */
 
@@ -337,122 +373,25 @@ function renderUpdateStatus(status) {
 
 updateBannerBtn.addEventListener("click", () => window.api.installUpdate());
 
-/* ---------- Formulário de configurações ---------- */
+/* ---------- Formulário de configurações (lista colapsada + modal de edição) ---------- */
 
-function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: false, notifyMode: "all", mutedBranches: [], group: "" }) {
-  const node = repoRowTemplate.content.cloneNode(true);
-  const row = node.querySelector(".repo-row");
-  row.querySelector(".repo-owner").value = repo.owner || "";
-  row.querySelector(".repo-name").value = repo.repo || "";
-  row.querySelector(".repo-group-input").value = repo.group || "";
-
-  let workflowFiles = Array.isArray(repo.workflowFiles) ? [...repo.workflowFiles] : [];
-  let muted = !!repo.muted;
-  let mutedBranches = Array.isArray(repo.mutedBranches) ? [...repo.mutedBranches] : [];
-
-  const chipsEl = row.querySelector(".workflow-chips");
-  const workflowInput = row.querySelector(".workflow-input");
-  const muteBtn = row.querySelector(".mute-repo-btn");
-  const notifySelect = row.querySelector(".notify-mode-select");
-  const branchChipsEl = row.querySelector(".muted-branches-chips");
-  const branchInput = row.querySelector(".muted-branches-input");
-
-  notifySelect.value = repo.notifyMode || "all";
-
-  function renderBranchChips() {
-    branchChipsEl.innerHTML = "";
-    for (const branch of mutedBranches) {
-      const chipNode = workflowChipTemplate.content.cloneNode(true);
-      chipNode.querySelector(".workflow-chip-label").textContent = branch;
-      chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
-        mutedBranches = mutedBranches.filter((existing) => existing !== branch);
-        renderBranchChips();
-      });
-      branchChipsEl.appendChild(chipNode);
-    }
-  }
-  renderBranchChips();
-
-  branchInput.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    const value = branchInput.value.trim();
-    if (value && !mutedBranches.includes(value)) {
-      mutedBranches.push(value);
-      renderBranchChips();
-    }
-    branchInput.value = "";
-  });
-
-  function renderChips() {
-    chipsEl.innerHTML = "";
-    for (const wf of workflowFiles) {
-      const chipNode = workflowChipTemplate.content.cloneNode(true);
-      chipNode.querySelector(".workflow-chip-label").textContent = wf;
-      chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
-        workflowFiles = workflowFiles.filter((existing) => existing !== wf);
-        renderChips();
-      });
-      chipsEl.appendChild(chipNode);
-    }
-  }
-  renderChips();
-
-  workflowInput.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    const value = workflowInput.value.trim();
-    if (value && !workflowFiles.includes(value)) {
-      workflowFiles.push(value);
-      renderChips();
-    }
-    workflowInput.value = "";
-  });
-
-  function applyMuteVisual() {
-    muteBtn.innerHTML = muted ? ICONS.bellOff : ICONS.bell;
-    muteBtn.classList.toggle("muted", muted);
-    muteBtn.title = muted ? "Notificações silenciadas — clique para reativar" : "Silenciar notificações";
-  }
-  applyMuteVisual();
-
-  muteBtn.addEventListener("click", () => {
-    muted = !muted;
-    applyMuteVisual();
-  });
-
-  row.querySelector(".remove-repo-btn").addEventListener("click", () => row.remove());
-
-  row.querySelector(".test-repo-btn").addEventListener("click", async () => {
-    const owner = row.querySelector(".repo-owner").value.trim();
-    const repoName = row.querySelector(".repo-name").value.trim();
-    const token = tokenInput.value.trim();
-    if (!owner || !repoName || !token) {
-      alert("Preencha token, owner e repositório antes de testar.");
-      return;
-    }
-    const result = await window.api.testToken({ token, owner, repo: repoName });
-    alert(result.ok ? "✅ Acesso OK!" : `❌ Falhou (status ${result.status})`);
-  });
-
-  // Lidos por collectRepos() na hora de salvar.
-  row._getWorkflowFiles = () => workflowFiles;
-  row._getMuted = () => muted;
-  row._getNotifyMode = () => notifySelect.value;
-  row._getMutedBranches = () => mutedBranches;
-  row._getGroup = () => row.querySelector(".repo-group-input").value.trim();
-
-  reposList.appendChild(node);
+function blankRepo() {
+  return {
+    owner: "",
+    repo: "",
+    workflowFiles: [],
+    muted: false,
+    notifyMode: "all",
+    mutedBranches: [],
+    group: "",
+    tags: [],
+  };
 }
 
 const repoGroupsDatalist = document.getElementById("repo-groups-list");
 
 function refreshGroupsDatalist() {
-  const groups = new Set();
-  reposList.querySelectorAll(".repo-group-input").forEach((input) => {
-    const value = input.value.trim();
-    if (value) groups.add(value);
-  });
+  const groups = new Set(draftRepos.map((r) => r.group).filter(Boolean));
   repoGroupsDatalist.innerHTML = "";
   for (const group of groups) {
     const option = document.createElement("option");
@@ -461,30 +400,207 @@ function refreshGroupsDatalist() {
   }
 }
 
+function renderRepoSummaryRows() {
+  reposList.innerHTML = "";
+  draftRepos.forEach((repo, index) => {
+    const node = repoSummaryRowTemplate.content.cloneNode(true);
+    const row = node.querySelector(".repo-summary-row");
+
+    row.querySelector(".repo-summary-name").textContent =
+      repo.owner && repo.repo ? `${repo.owner}/${repo.repo}` : "(novo — clique em editar)";
+
+    const groupEl = row.querySelector(".repo-summary-group");
+    if (repo.group) {
+      groupEl.hidden = false;
+      groupEl.textContent = repo.group;
+    }
+
+    const tagsEl = row.querySelector(".repo-summary-tags");
+    for (const tag of repo.tags || []) {
+      const pill = document.createElement("span");
+      pill.className = "tag-pill";
+      pill.textContent = tag;
+      tagsEl.appendChild(pill);
+    }
+
+    const muteBtn = row.querySelector(".mute-repo-btn");
+    function applyMuteVisual() {
+      muteBtn.innerHTML = repo.muted ? ICONS.bellOff : ICONS.bell;
+      muteBtn.classList.toggle("muted", repo.muted);
+      muteBtn.title = repo.muted ? "Notificações silenciadas — clique para reativar" : "Silenciar notificações";
+    }
+    applyMuteVisual();
+    muteBtn.addEventListener("click", () => {
+      repo.muted = !repo.muted;
+      applyMuteVisual();
+    });
+
+    row.querySelector(".test-repo-btn").addEventListener("click", async () => {
+      const token = tokenInput.value.trim();
+      if (!repo.owner || !repo.repo || !token) {
+        alert("Preencha token, owner e repositório antes de testar.");
+        return;
+      }
+      const result = await window.api.testToken({ token, owner: repo.owner, repo: repo.repo });
+      alert(result.ok ? "✅ Acesso OK!" : `❌ Falhou (status ${result.status})`);
+    });
+
+    row.querySelector(".edit-repo-btn").addEventListener("click", () => openRepoEditModal(index));
+
+    row.querySelector(".remove-repo-btn").addEventListener("click", () => {
+      draftRepos.splice(index, 1);
+      renderRepoSummaryRows();
+      refreshGroupsDatalist();
+    });
+
+    reposList.appendChild(node);
+  });
+}
+
+function renderRepoEditWorkflowChips() {
+  repoEditWorkflowsChipsEl.innerHTML = "";
+  for (const wf of repoEditWorkflowFiles) {
+    const chipNode = workflowChipTemplate.content.cloneNode(true);
+    chipNode.querySelector(".workflow-chip-label").textContent = wf;
+    chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
+      repoEditWorkflowFiles = repoEditWorkflowFiles.filter((existing) => existing !== wf);
+      renderRepoEditWorkflowChips();
+    });
+    repoEditWorkflowsChipsEl.appendChild(chipNode);
+  }
+}
+repoEditWorkflowsInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const value = repoEditWorkflowsInput.value.trim();
+  if (value && !repoEditWorkflowFiles.includes(value)) {
+    repoEditWorkflowFiles.push(value);
+    renderRepoEditWorkflowChips();
+  }
+  repoEditWorkflowsInput.value = "";
+});
+
+function renderRepoEditBranchChips() {
+  repoEditBranchesChipsEl.innerHTML = "";
+  for (const branch of repoEditMutedBranches) {
+    const chipNode = workflowChipTemplate.content.cloneNode(true);
+    chipNode.querySelector(".workflow-chip-label").textContent = branch;
+    chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
+      repoEditMutedBranches = repoEditMutedBranches.filter((existing) => existing !== branch);
+      renderRepoEditBranchChips();
+    });
+    repoEditBranchesChipsEl.appendChild(chipNode);
+  }
+}
+repoEditBranchesInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const value = repoEditBranchesInput.value.trim();
+  if (value && !repoEditMutedBranches.includes(value)) {
+    repoEditMutedBranches.push(value);
+    renderRepoEditBranchChips();
+  }
+  repoEditBranchesInput.value = "";
+});
+
+function renderRepoEditTagChips() {
+  repoEditTagsChipsEl.innerHTML = "";
+  for (const tag of repoEditTags) {
+    const chipNode = workflowChipTemplate.content.cloneNode(true);
+    chipNode.querySelector(".workflow-chip-label").textContent = tag;
+    chipNode.querySelector(".workflow-chip-remove").addEventListener("click", () => {
+      repoEditTags = repoEditTags.filter((existing) => existing !== tag);
+      renderRepoEditTagChips();
+    });
+    repoEditTagsChipsEl.appendChild(chipNode);
+  }
+}
+repoEditTagsInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const value = repoEditTagsInput.value.trim();
+  if (value && !repoEditTags.includes(value)) {
+    repoEditTags.push(value);
+    renderRepoEditTagChips();
+  }
+  repoEditTagsInput.value = "";
+});
+
+function openRepoEditModal(index, { isNew = false } = {}) {
+  repoEditIndex = index;
+  repoEditIsNew = isNew;
+  const repo = draftRepos[index];
+
+  repoEditModalTitle.textContent = repo.owner && repo.repo ? `${repo.owner}/${repo.repo}` : "Novo repositório";
+  repoEditOwnerInput.value = repo.owner || "";
+  repoEditRepoInput.value = repo.repo || "";
+  repoEditGroupInput.value = repo.group || "";
+  repoEditMutedInput.checked = !!repo.muted;
+  repoEditNotifyModeSelect.value = repo.notifyMode || "all";
+  repoEditWorkflowFiles = Array.isArray(repo.workflowFiles) ? [...repo.workflowFiles] : [];
+  repoEditMutedBranches = Array.isArray(repo.mutedBranches) ? [...repo.mutedBranches] : [];
+  repoEditTags = Array.isArray(repo.tags) ? [...repo.tags] : [];
+  renderRepoEditWorkflowChips();
+  renderRepoEditBranchChips();
+  renderRepoEditTagChips();
+  repoEditErrorEl.hidden = true;
+  repoEditModal.hidden = false;
+}
+
+function closeRepoEditModal({ discardIfNew = false } = {}) {
+  if (discardIfNew && repoEditIsNew && repoEditIndex !== null) {
+    draftRepos.splice(repoEditIndex, 1);
+    renderRepoSummaryRows();
+  }
+  repoEditModal.hidden = true;
+  repoEditIndex = null;
+  repoEditIsNew = false;
+}
+
+repoEditModalClose.addEventListener("click", () => closeRepoEditModal({ discardIfNew: true }));
+repoEditModal.querySelector(".app-modal-backdrop").addEventListener("click", () => closeRepoEditModal({ discardIfNew: true }));
+
+repoEditSaveBtn.addEventListener("click", () => {
+  if (repoEditIndex === null) return;
+  const owner = repoEditOwnerInput.value.trim();
+  const repoName = repoEditRepoInput.value.trim();
+  if (!owner || !repoName) {
+    repoEditErrorEl.hidden = false;
+    repoEditErrorEl.textContent = "Preencha owner e repositório.";
+    return;
+  }
+
+  draftRepos[repoEditIndex] = {
+    owner,
+    repo: repoName,
+    group: repoEditGroupInput.value.trim(),
+    tags: repoEditTags,
+    workflowFiles: repoEditWorkflowFiles,
+    notifyMode: repoEditNotifyModeSelect.value,
+    mutedBranches: repoEditMutedBranches,
+    muted: repoEditMutedInput.checked,
+  };
+
+  closeRepoEditModal();
+  renderRepoSummaryRows();
+  refreshGroupsDatalist();
+});
+
 function loadReposIntoForm(repos) {
   currentRepos = repos;
-  reposList.innerHTML = "";
-  if (repos.length === 0) {
-    addRepoRow();
-  } else {
-    repos.forEach(addRepoRow);
-  }
+  draftRepos = repos.map((r) => ({
+    ...r,
+    workflowFiles: [...(r.workflowFiles || [])],
+    mutedBranches: [...(r.mutedBranches || [])],
+    tags: [...(r.tags || [])],
+  }));
+  renderRepoSummaryRows();
   refreshGroupsDatalist();
   renderDashboard();
 }
 
 function collectRepos() {
-  return Array.from(reposList.querySelectorAll(".repo-row"))
-    .map((row) => ({
-      owner: row.querySelector(".repo-owner").value.trim(),
-      repo: row.querySelector(".repo-name").value.trim(),
-      workflowFiles: row._getWorkflowFiles ? row._getWorkflowFiles() : [],
-      muted: row._getMuted ? row._getMuted() : false,
-      notifyMode: row._getNotifyMode ? row._getNotifyMode() : "all",
-      mutedBranches: row._getMutedBranches ? row._getMutedBranches() : [],
-      group: row._getGroup ? row._getGroup() : "",
-    }))
-    .filter((r) => r.owner && r.repo);
+  return draftRepos.filter((r) => r.owner && r.repo);
 }
 
 async function refreshStatus() {
@@ -575,7 +691,11 @@ function applyStatus(isRunning) {
   }
 }
 
-addRepoBtn.addEventListener("click", () => addRepoRow());
+addRepoBtn.addEventListener("click", () => {
+  draftRepos.push(blankRepo());
+  renderRepoSummaryRows();
+  openRepoEditModal(draftRepos.length - 1, { isNew: true });
+});
 
 toggleTokenVisibility.addEventListener("click", () => {
   tokenInput.type = tokenInput.type === "password" ? "text" : "password";
@@ -791,7 +911,8 @@ function renderDashboard() {
 
   rows.sort((a, b) => STATUS_PRIORITY[a.info.cls] - STATUS_PRIORITY[b.info.cls] || a.repoKey.localeCompare(b.repoKey));
 
-  const visibleRows = currentFilter === "all" ? rows : rows.filter((r) => r.info.cls === currentFilter);
+  const statusFiltered = currentFilter === "all" ? rows : rows.filter((r) => r.info.cls === currentFilter);
+  const visibleRows = statusFiltered.filter((r) => matchesSearch(r.repo));
 
   repoCards.innerHTML = "";
   emptyState.hidden = visibleRows.length > 0;
@@ -801,7 +922,7 @@ function renderDashboard() {
     emptyText.textContent = "Nenhum repositório configurado ainda.";
     emptyLinkBtn.hidden = false;
   } else {
-    emptyText.textContent = "Nenhum repositório corresponde a esse filtro.";
+    emptyText.textContent = "Nenhum repositório corresponde a esse filtro/busca.";
     emptyLinkBtn.hidden = true;
   }
 
@@ -891,6 +1012,14 @@ function renderRepoCard(container, { repo, repoKey, summary, info }) {
     runEl.textContent = `workflows: ${repo.workflowFiles.join(", ")}`;
   } else {
     runEl.textContent = "—";
+  }
+
+  const tagsEl = card.querySelector(".repo-card-tags");
+  for (const tag of repo.tags || []) {
+    const pill = document.createElement("span");
+    pill.className = "tag-pill";
+    pill.textContent = tag;
+    tagsEl.appendChild(pill);
   }
 
   const metaEl = card.querySelector(".repo-card-meta");

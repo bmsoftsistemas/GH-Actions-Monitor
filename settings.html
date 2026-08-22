@@ -79,6 +79,7 @@
           <button class="filter-btn active" data-filter="all" type="button">Todos</button>
           <button class="filter-btn" data-filter="failure" type="button">Apenas falhas</button>
           <button class="filter-btn" data-filter="progress" type="button">Rodando agora</button>
+          <input type="text" id="dashboard-search" class="dashboard-search" placeholder="Buscar por repo, owner, grupo ou tag…" />
         </div>
 
         <div id="repo-cards" class="repo-cards"></div>
@@ -161,37 +162,25 @@
     </div>
   </div>
 
-  <template id="repo-row-template">
-    <div class="repo-row">
-      <div class="repo-row-main">
-        <input type="text" class="repo-owner" placeholder="owner (ex: minha-org)" />
-        <input type="text" class="repo-name" placeholder="repositorio" />
-        <button class="mute-repo-btn" type="button" title="Silenciar notificações"></button>
-        <button class="test-repo-btn" type="button" title="Testar acesso">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
-        <button class="remove-repo-btn" type="button" title="Remover">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+  <template id="repo-summary-row-template">
+    <div class="repo-summary-row">
+      <button class="mute-repo-btn" type="button" title="Silenciar notificações"></button>
+      <div class="repo-summary-main">
+        <div class="repo-summary-name-line">
+          <span class="repo-summary-name"></span>
+          <span class="repo-summary-group" hidden></span>
+        </div>
+        <div class="repo-summary-tags"></div>
       </div>
-      <div class="repo-row-group">
-        <input type="text" class="repo-group-input" list="repo-groups-list" placeholder="Grupo (opcional, ex: Backend) — agrupa no dashboard" />
-      </div>
-      <div class="repo-row-workflows">
-        <div class="workflow-chips"></div>
-        <input type="text" class="workflow-input" placeholder="workflow.yml (opcional — Enter para adicionar, vazio = todos)" />
-      </div>
-      <div class="repo-row-notify">
-        <select class="notify-mode-select" title="Granularidade das notificações">
-          <option value="all">Notificar tudo (sucesso e falha)</option>
-          <option value="failure-only">Notificar só falhas</option>
-          <option value="failure-and-fixed">Falhas + quando voltar a passar</option>
-        </select>
-      </div>
-      <div class="repo-row-branches">
-        <div class="muted-branches-chips"></div>
-        <input type="text" class="muted-branches-input" placeholder="branch pra silenciar (opcional — Enter para adicionar)" />
-      </div>
+      <button class="test-repo-btn" type="button" title="Testar acesso">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button class="edit-repo-btn" type="button" title="Editar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="remove-repo-btn" type="button" title="Remover">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
   </template>
 
@@ -231,6 +220,7 @@
         </button>
       </div>
       <div class="repo-card-run"></div>
+      <div class="repo-card-tags"></div>
       <div class="repo-card-meta"></div>
       <div class="repo-card-history"></div>
     </div>
@@ -298,6 +288,72 @@
       </div>
       <footer class="dispatch-modal-footer">
         <button id="dispatch-submit-btn" type="button">Disparar</button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="repo-edit-modal" class="app-modal" hidden>
+    <div class="app-modal-backdrop"></div>
+    <div class="app-modal-box">
+      <div class="app-modal-header">
+        <span id="repo-edit-modal-title">Repositório</span>
+        <button id="repo-edit-modal-close" type="button" title="Fechar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="dispatch-modal-body repo-edit-modal-body">
+        <div class="field-row">
+          <div class="field">
+            <label for="repo-edit-owner">Owner</label>
+            <input type="text" id="repo-edit-owner" placeholder="ex: minha-org" />
+          </div>
+          <div class="field">
+            <label for="repo-edit-repo">Repositório</label>
+            <input type="text" id="repo-edit-repo" placeholder="repositorio" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="repo-edit-group">Grupo (opcional)</label>
+          <input type="text" id="repo-edit-group" list="repo-groups-list" placeholder="ex: Backend — agrupa no dashboard" />
+        </div>
+
+        <div class="field">
+          <label>Tags (opcional)</label>
+          <div class="workflow-chips" id="repo-edit-tags-chips"></div>
+          <input type="text" id="repo-edit-tags-input" placeholder="tag (Enter para adicionar, ex: youtube)" />
+        </div>
+
+        <div class="field">
+          <label>Workflows monitorados</label>
+          <div class="workflow-chips" id="repo-edit-workflows-chips"></div>
+          <input type="text" id="repo-edit-workflows-input" placeholder="workflow.yml (Enter para adicionar, vazio = todos)" />
+        </div>
+
+        <div class="field">
+          <label for="repo-edit-notify-mode">Notificações</label>
+          <select id="repo-edit-notify-mode">
+            <option value="all">Notificar tudo (sucesso e falha)</option>
+            <option value="failure-only">Notificar só falhas</option>
+            <option value="failure-and-fixed">Falhas + quando voltar a passar</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Branches silenciadas (opcional)</label>
+          <div class="workflow-chips" id="repo-edit-branches-chips"></div>
+          <input type="text" id="repo-edit-branches-input" placeholder="branch (Enter para adicionar)" />
+        </div>
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="repo-edit-muted" />
+          Silenciar notificações desse repositório
+        </label>
+
+        <p id="repo-edit-error" class="dispatch-error" hidden></p>
+      </div>
+      <footer class="dispatch-modal-footer">
+        <button id="repo-edit-save-btn" type="button">Salvar</button>
       </footer>
     </div>
   </div>

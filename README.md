@@ -35,25 +35,29 @@ ainda) e coloca um ícone na bandeja do sistema.
    token classic, os escopos concedidos (fine-grained não expõe isso pela
    API; nesse caso teste o acesso a um repo específico com o 🔎 de cada
    linha).
-2. Adicione os repositórios (`owner` + `repo`). Opcionalmente, digite o
-   nome de um ou mais arquivos de workflow (ex: `ci.yml`, Enter para
-   adicionar cada um) para filtrar quais workflows monitorar — deixe vazio
-   para acompanhar todos.
-3. Use o ícone de lupa em cada linha para testar o acesso antes de salvar,
-   e o ícone de sino pra silenciar completamente as notificações daquele
-   repo (continua monitorado e aparecendo no dashboard, só não dispara
-   toast). Pra um controle mais fino, use o seletor **"Notificar tudo /
-   Notificar só falhas / Falhas + quando voltar a passar"** e o campo de
+2. Clique em **"+ Adicionar"** — abre um modal pra preencher `owner` +
+   `repo`, grupo, tags, workflows monitorados, granularidade de
+   notificação e branches silenciadas. Depois de salvo, o repositório
+   aparece na lista como uma linha compacta (só nome, grupo e tags) — clique
+   no ícone de lápis pra editar de novo. Isso mantém a lista curta mesmo
+   com muitos repositórios monitorados.
+3. Use o ícone de lupa em cada linha para testar o acesso, e o ícone de
+   sino pra silenciar completamente as notificações daquele repo (continua
+   monitorado e aparecendo no dashboard, só não dispara toast). Pra um
+   controle mais fino, o modal de edição tem o seletor **"Notificar tudo /
+   Notificar só falhas / Falhas + quando voltar a passar"** e um campo de
    branches pra silenciar notificações só de branches específicas (nome
    exato, ex: `dev`) sem silenciar o repo inteiro.
-4. Opcionalmente, dê um **grupo** pro repositório (ex: `Backend`,
-   `Frontend`, `DevOps`) — no dashboard, os cards ficam organizados em
-   seções por grupo (repos sem grupo caem numa seção "Sem grupo" no
-   final). Use **Importar/Exportar** pra compartilhar a lista de
-   repositórios (com grupos, filtros de workflow e preferências de
-   notificação) com a equipe — o Token nunca entra no arquivo exportado.
-   Importar soma repositórios novos à sua lista atual sem duplicar os que
-   já existem (por owner/repo).
+4. Opcionalmente, dê um **grupo** (ex: `Backend`, `Frontend`, `DevOps`) —
+   no dashboard, os cards ficam organizados em seções por grupo (repos sem
+   grupo caem numa seção "Sem grupo" no final) — e **tags** livres (ex:
+   `youtube`, `prod`) pra marcar repositórios como quiser. O campo de
+   busca no dashboard (ao lado dos filtros de status) filtra por nome do
+   repo, owner, grupo ou tag ao mesmo tempo. Use **Importar/Exportar** pra
+   compartilhar a lista de repositórios (com grupos, tags, filtros de
+   workflow e preferências de notificação) com a equipe — o Token nunca
+   entra no arquivo exportado. Importar soma repositórios novos à sua
+   lista atual sem duplicar os que já existem (por owner/repo).
 5. Clique em **Salvar**. Se o monitoramento já estiver ligado, ele reinicia
    automaticamente com a nova configuração.
 6. Na aba **Monitoramento**, cada repositório aparece como um card

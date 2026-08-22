@@ -276,6 +276,13 @@ body {
 .filter-btn:hover { background: var(--surface-hover); color: var(--text); }
 .filter-btn.active { background: var(--accent-soft); color: var(--accent-soft-text); }
 
+.dashboard-search {
+  flex: 1;
+  min-width: 140px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+}
+
 /* ---------- Dashboard / repo cards ---------- */
 
 .repo-cards {
@@ -391,6 +398,25 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.repo-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.repo-card-tags:empty { display: none; margin-bottom: 0; }
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .repo-card-meta {
@@ -544,18 +570,19 @@ button {
 }
 button:hover { background: var(--accent-hover); }
 
-.icon-btn, .test-repo-btn, .remove-repo-btn, .ghost-btn, .mute-repo-btn {
+.icon-btn, .test-repo-btn, .edit-repo-btn, .remove-repo-btn, .ghost-btn, .mute-repo-btn {
   background: var(--surface);
   color: var(--text);
   padding: 7px 10px;
   font-weight: 400;
 }
-.icon-btn, .test-repo-btn, .remove-repo-btn, .mute-repo-btn {
+.icon-btn, .test-repo-btn, .edit-repo-btn, .remove-repo-btn, .mute-repo-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
-.icon-btn:hover, .test-repo-btn:hover, .ghost-btn:hover, .mute-repo-btn:hover { background: var(--surface-hover); }
+.icon-btn:hover, .test-repo-btn:hover, .edit-repo-btn:hover, .ghost-btn:hover, .mute-repo-btn:hover { background: var(--surface-hover); }
 .remove-repo-btn { background: var(--danger-soft); color: var(--danger-text); }
 .remove-repo-btn:hover { background: var(--danger-soft-hover); }
 .mute-repo-btn.muted { background: var(--warn-soft); }
@@ -565,33 +592,55 @@ button:hover { background: var(--accent-hover); }
 .repos-header label { margin: 0; }
 .repos-header-actions { display: flex; gap: 6px; }
 
-.repo-row-group { margin-top: 6px; }
-
 #token-test-result.token-test-ok { color: var(--green); }
 #token-test-result.token-test-error { color: var(--danger-text); }
 
-.repo-row {
+.repo-summary-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
 }
 
-.repo-row-main {
-  display: grid;
-  grid-template-columns: 1.2fr 1.2fr auto auto auto;
-  gap: 6px;
-}
-
-.repo-row-workflows {
+.repo-summary-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
+
+.repo-summary-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.repo-summary-name {
+  font-weight: 600;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-summary-group {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.repo-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.repo-summary-tags:empty { display: none; }
 
 .workflow-chips {
   display: flex;
@@ -618,12 +667,6 @@ button:hover { background: var(--accent-hover); }
   align-items: center;
 }
 .workflow-chip-remove:hover { color: var(--danger-text); background: transparent; }
-
-.repo-row-notify, .repo-row-branches {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 
 select {
   width: 100%;
@@ -744,7 +787,7 @@ textarea {
 }
 textarea:focus { outline: none; border-color: var(--accent); }
 
-.dispatch-modal-body { display: flex; flex-direction: column; gap: 14px; }
+.dispatch-modal-body { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; }
 .dispatch-error { color: var(--danger-text); font-size: 12px; margin: 0; }
 .dispatch-modal-footer { display: flex; justify-content: flex-end; padding-top: 4px; }
 
