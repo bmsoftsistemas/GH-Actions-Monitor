@@ -1,6 +1,6 @@
 {
   "name": "gh-actions-watcher-gui",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "App de bandeja para monitorar GitHub Actions e mostrar toasts, com GUI de configuração",
   "main": "main.js",
   "scripts": {
