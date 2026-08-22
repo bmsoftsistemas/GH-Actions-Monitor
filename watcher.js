@@ -375,6 +375,46 @@ async function dispatchWorkflow({ owner, repo, workflowFile, ref, inputs }, toke
   return { ok: false, status: res.status, error: message };
 }
 
+/**
+ * Valida o token direto contra a API (sem depender de um repo específico) e
+ * lê os escopos concedidos. O header `x-oauth-scopes` só existe pra tokens
+ * classic — fine-grained não expõe as permissões concedidas por essa via,
+ * só dá pra confirmar validade e sugerir testar um repo específico.
+ */
+async function checkTokenValidity(token) {
+  const res = await fetch("https://api.github.com/user", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  const scopesHeader = res.headers.get("x-oauth-scopes");
+  const tokenType = token.startsWith("github_pat_")
+    ? "fine-grained"
+    : token.startsWith("ghp_")
+    ? "classic"
+    : token.startsWith("gho_")
+    ? "oauth"
+    : "desconhecido";
+
+  if (!res.ok) {
+    return { ok: false, status: res.status, tokenType };
+  }
+
+  const data = await res.json();
+  return {
+    ok: true,
+    status: res.status,
+    login: data.login,
+    tokenType,
+    scopes: scopesHeader
+      ? scopesHeader.split(",").map((s) => s.trim()).filter(Boolean)
+      : [],
+  };
+}
+
 module.exports = {
   checkAll,
   RateLimitError,
@@ -384,4 +424,5 @@ module.exports = {
   fetchJobLog,
   extractStepLog,
   dispatchWorkflow,
+  checkTokenValidity,
 };

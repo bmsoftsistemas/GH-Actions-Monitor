@@ -3,6 +3,10 @@ const intervalInput = document.getElementById("interval");
 const pollSubtitle = document.getElementById("poll-subtitle");
 const startOnLoginInput = document.getElementById("start-on-login");
 const soundEnabledInput = document.getElementById("sound-enabled");
+const testTokenBtn = document.getElementById("test-token-btn");
+const tokenTestResultEl = document.getElementById("token-test-result");
+const exportConfigBtn = document.getElementById("export-config-btn");
+const importConfigBtn = document.getElementById("import-config-btn");
 const reposList = document.getElementById("repos-list");
 const repoRowTemplate = document.getElementById("repo-row-template");
 const workflowChipTemplate = document.getElementById("workflow-chip-template");
@@ -335,11 +339,12 @@ updateBannerBtn.addEventListener("click", () => window.api.installUpdate());
 
 /* ---------- Formulário de configurações ---------- */
 
-function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: false, notifyMode: "all", mutedBranches: [] }) {
+function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: false, notifyMode: "all", mutedBranches: [], group: "" }) {
   const node = repoRowTemplate.content.cloneNode(true);
   const row = node.querySelector(".repo-row");
   row.querySelector(".repo-owner").value = repo.owner || "";
   row.querySelector(".repo-name").value = repo.repo || "";
+  row.querySelector(".repo-group-input").value = repo.group || "";
 
   let workflowFiles = Array.isArray(repo.workflowFiles) ? [...repo.workflowFiles] : [];
   let muted = !!repo.muted;
@@ -435,8 +440,37 @@ function addRepoRow(repo = { owner: "", repo: "", workflowFiles: [], muted: fals
   row._getMuted = () => muted;
   row._getNotifyMode = () => notifySelect.value;
   row._getMutedBranches = () => mutedBranches;
+  row._getGroup = () => row.querySelector(".repo-group-input").value.trim();
 
   reposList.appendChild(node);
+}
+
+const repoGroupsDatalist = document.getElementById("repo-groups-list");
+
+function refreshGroupsDatalist() {
+  const groups = new Set();
+  reposList.querySelectorAll(".repo-group-input").forEach((input) => {
+    const value = input.value.trim();
+    if (value) groups.add(value);
+  });
+  repoGroupsDatalist.innerHTML = "";
+  for (const group of groups) {
+    const option = document.createElement("option");
+    option.value = group;
+    repoGroupsDatalist.appendChild(option);
+  }
+}
+
+function loadReposIntoForm(repos) {
+  currentRepos = repos;
+  reposList.innerHTML = "";
+  if (repos.length === 0) {
+    addRepoRow();
+  } else {
+    repos.forEach(addRepoRow);
+  }
+  refreshGroupsDatalist();
+  renderDashboard();
 }
 
 function collectRepos() {
@@ -448,6 +482,7 @@ function collectRepos() {
       muted: row._getMuted ? row._getMuted() : false,
       notifyMode: row._getNotifyMode ? row._getNotifyMode() : "all",
       mutedBranches: row._getMutedBranches ? row._getMutedBranches() : [],
+      group: row._getGroup ? row._getGroup() : "",
     }))
     .filter((r) => r.owner && r.repo);
 }
@@ -546,6 +581,57 @@ toggleTokenVisibility.addEventListener("click", () => {
   tokenInput.type = tokenInput.type === "password" ? "text" : "password";
 });
 
+testTokenBtn.addEventListener("click", async () => {
+  const token = tokenInput.value.trim();
+  if (!token) {
+    alert("Cole o token primeiro.");
+    return;
+  }
+  testTokenBtn.disabled = true;
+  tokenTestResultEl.hidden = false;
+  tokenTestResultEl.className = "hint";
+  tokenTestResultEl.textContent = "Testando…";
+  try {
+    const result = await window.api.testTokenValidity(token);
+    if (!result.ok) {
+      tokenTestResultEl.classList.add("token-test-error");
+      tokenTestResultEl.textContent = `Token inválido ou expirado (status ${result.status}).`;
+      return;
+    }
+    const typeLabel = { classic: "classic", "fine-grained": "fine-grained", oauth: "OAuth" }[result.tokenType] || "desconhecido";
+    const scopesText =
+      result.scopes.length > 0
+        ? `Escopos: ${result.scopes.join(", ")}.`
+        : "Sem escopos expostos pela API (normal em token fine-grained) — use o 🔎 de cada repo pra confirmar o acesso.";
+    tokenTestResultEl.classList.add("token-test-ok");
+    tokenTestResultEl.textContent = `✓ Token válido — usuário ${result.login}, tipo ${typeLabel}. ${scopesText}`;
+  } finally {
+    testTokenBtn.disabled = false;
+  }
+});
+
+exportConfigBtn.addEventListener("click", async () => {
+  const result = await window.api.exportConfig();
+  if (result.canceled) return;
+  if (!result.ok) {
+    alert("Falha ao exportar a configuração.");
+    return;
+  }
+  alert(`Configuração exportada (sem o token) para:\n${result.filePath}`);
+});
+
+importConfigBtn.addEventListener("click", async () => {
+  const result = await window.api.importConfig();
+  if (result.canceled) return;
+  if (!result.ok) {
+    alert(`Falha ao importar: ${result.error}`);
+    return;
+  }
+  loadReposIntoForm(result.config.repos);
+  const skippedText = result.skipped > 0 ? ` (${result.skipped} já existiam e foram ignorados)` : "";
+  alert(`Importados ${result.added} repositório(s) novo(s)${skippedText}.`);
+});
+
 toggleBtn.addEventListener("click", async () => {
   const { isRunning } = await window.api.toggle();
   applyStatus(isRunning);
@@ -572,6 +658,7 @@ saveBtn.addEventListener("click", async () => {
   await window.api.saveConfig(config);
   currentRepos = config.repos;
   currentPollIntervalMs = config.pollIntervalMs;
+  refreshGroupsDatalist();
   saveFeedback.textContent = "Salvo ✓";
   setTimeout(() => (saveFeedback.textContent = ""), 2000);
   renderDashboard();
@@ -718,86 +805,121 @@ function renderDashboard() {
     emptyLinkBtn.hidden = true;
   }
 
-  for (const { repo, repoKey, summary, info } of visibleRows) {
-    const node = repoCardTemplate.content.cloneNode(true);
-    const card = node.querySelector(".repo-card");
-    const badge = card.querySelector(".repo-card-badge");
-    badge.classList.add(info.cls);
-    badge.innerHTML = STATUS_ICONS[info.cls] || STATUS_ICONS.unknown;
-    card.querySelector(".repo-card-name").textContent = repoKey;
-    card.querySelector(".repo-card-muted-icon").hidden = !repo.muted;
-
-    const openBtn = card.querySelector(".repo-card-open-btn");
-    if (summary && summary.htmlUrl) {
-      openBtn.hidden = false;
-      openBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        window.api.openExternal(summary.htmlUrl);
-      });
-    }
-
-    const cancelBtn = card.querySelector(".repo-card-cancel-btn");
-    if (info.cls === "progress" && summary && summary.id) {
-      cancelBtn.hidden = false;
-      cancelBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        handleCancelClick(cancelBtn, { owner: repo.owner, repo: repo.repo, runId: summary.id });
-      });
-    }
-
-    const cardRerunBtn = card.querySelector(".repo-card-rerun-btn");
-    if (info.cls === "failure" && summary && summary.id) {
-      cardRerunBtn.hidden = false;
-      cardRerunBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        handleRerunClick(cardRerunBtn, { owner: repo.owner, repo: repo.repo, runId: summary.id });
-      });
-    }
-
-    card.querySelector(".repo-card-dispatch-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      openDispatchModal(repo);
-    });
-
-    const runEl = card.querySelector(".repo-card-run");
-    if (summary && !summary.error && !summary.empty) {
-      runEl.textContent = `${summary.name || "workflow"} · ${summary.headBranch || ""} #${summary.runNumber ?? ""}`;
-    } else if (summary && summary.error) {
-      runEl.textContent = summary.error;
-    } else if (repo.workflowFiles && repo.workflowFiles.length > 0) {
-      runEl.textContent = `workflows: ${repo.workflowFiles.join(", ")}`;
-    } else {
-      runEl.textContent = "—";
-    }
-
-    const metaEl = card.querySelector(".repo-card-meta");
-    const pill = document.createElement("span");
-    pill.className = `status-pill ${info.cls}`;
-    pill.textContent = info.label;
-    const time = document.createElement("span");
-    time.textContent = summary && summary.updatedAt ? formatRelativeTime(summary.updatedAt) : "";
-    metaEl.appendChild(pill);
-    metaEl.appendChild(time);
-
-    renderHistory(card, repo, summary && summary.recentRuns);
-    card.classList.toggle("expanded", expandedRepos.has(repoKey));
-
-    card.querySelector(".repo-card-expand").addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (expandedRepos.has(repoKey)) {
-        expandedRepos.delete(repoKey);
-      } else {
-        expandedRepos.add(repoKey);
-      }
-      card.classList.toggle("expanded", expandedRepos.has(repoKey));
-    });
-
-    if (summary && summary.htmlUrl) {
-      card.addEventListener("click", () => window.api.openExternal(summary.htmlUrl));
-    }
-
-    repoCards.appendChild(node);
+  // Agrupa preservando a ordem já definida pelo sort acima (falhas primeiro
+  // dentro de cada grupo). Grupos nomeados em ordem alfabética; "Sem grupo"
+  // sempre por último. Se ninguém usa grupo, pula os títulos de seção.
+  const groups = new Map();
+  for (const row of visibleRows) {
+    const groupName = row.repo.group || "Sem grupo";
+    if (!groups.has(groupName)) groups.set(groupName, []);
+    groups.get(groupName).push(row);
   }
+  const groupNames = [...groups.keys()].sort((a, b) => {
+    if (a === "Sem grupo") return 1;
+    if (b === "Sem grupo") return -1;
+    return a.localeCompare(b);
+  });
+  const showGroupTitles = groupNames.some((name) => name !== "Sem grupo");
+
+  for (const groupName of groupNames) {
+    const groupSection = document.createElement("div");
+    groupSection.className = "repo-group";
+    if (showGroupTitles) {
+      const title = document.createElement("h2");
+      title.className = "repo-group-title";
+      title.textContent = groupName;
+      groupSection.appendChild(title);
+    }
+    const grid = document.createElement("div");
+    grid.className = "repo-cards-grid";
+    groupSection.appendChild(grid);
+    repoCards.appendChild(groupSection);
+
+    for (const { repo, repoKey, summary, info } of groups.get(groupName)) {
+      renderRepoCard(grid, { repo, repoKey, summary, info });
+    }
+  }
+}
+
+function renderRepoCard(container, { repo, repoKey, summary, info }) {
+  const node = repoCardTemplate.content.cloneNode(true);
+  const card = node.querySelector(".repo-card");
+  const badge = card.querySelector(".repo-card-badge");
+  badge.classList.add(info.cls);
+  badge.innerHTML = STATUS_ICONS[info.cls] || STATUS_ICONS.unknown;
+  card.querySelector(".repo-card-name").textContent = repoKey;
+  card.querySelector(".repo-card-muted-icon").hidden = !repo.muted;
+
+  const openBtn = card.querySelector(".repo-card-open-btn");
+  if (summary && summary.htmlUrl) {
+    openBtn.hidden = false;
+    openBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.api.openExternal(summary.htmlUrl);
+    });
+  }
+
+  const cancelBtn = card.querySelector(".repo-card-cancel-btn");
+  if (info.cls === "progress" && summary && summary.id) {
+    cancelBtn.hidden = false;
+    cancelBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleCancelClick(cancelBtn, { owner: repo.owner, repo: repo.repo, runId: summary.id });
+    });
+  }
+
+  const cardRerunBtn = card.querySelector(".repo-card-rerun-btn");
+  if (info.cls === "failure" && summary && summary.id) {
+    cardRerunBtn.hidden = false;
+    cardRerunBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleRerunClick(cardRerunBtn, { owner: repo.owner, repo: repo.repo, runId: summary.id });
+    });
+  }
+
+  card.querySelector(".repo-card-dispatch-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    openDispatchModal(repo);
+  });
+
+  const runEl = card.querySelector(".repo-card-run");
+  if (summary && !summary.error && !summary.empty) {
+    runEl.textContent = `${summary.name || "workflow"} · ${summary.headBranch || ""} #${summary.runNumber ?? ""}`;
+  } else if (summary && summary.error) {
+    runEl.textContent = summary.error;
+  } else if (repo.workflowFiles && repo.workflowFiles.length > 0) {
+    runEl.textContent = `workflows: ${repo.workflowFiles.join(", ")}`;
+  } else {
+    runEl.textContent = "—";
+  }
+
+  const metaEl = card.querySelector(".repo-card-meta");
+  const pill = document.createElement("span");
+  pill.className = `status-pill ${info.cls}`;
+  pill.textContent = info.label;
+  const time = document.createElement("span");
+  time.textContent = summary && summary.updatedAt ? formatRelativeTime(summary.updatedAt) : "";
+  metaEl.appendChild(pill);
+  metaEl.appendChild(time);
+
+  renderHistory(card, repo, summary && summary.recentRuns);
+  card.classList.toggle("expanded", expandedRepos.has(repoKey));
+
+  card.querySelector(".repo-card-expand").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (expandedRepos.has(repoKey)) {
+      expandedRepos.delete(repoKey);
+    } else {
+      expandedRepos.add(repoKey);
+    }
+    card.classList.toggle("expanded", expandedRepos.has(repoKey));
+  });
+
+  if (summary && summary.htmlUrl) {
+    card.addEventListener("click", () => window.api.openExternal(summary.htmlUrl));
+  }
+
+  container.appendChild(node);
 }
 
 function renderRateLimit(rateLimit) {
@@ -819,15 +941,9 @@ async function init() {
   currentPollIntervalMs = config.pollIntervalMs || 30000;
   startOnLoginInput.checked = !!config.startOnLogin;
   soundEnabledInput.checked = config.soundEnabled !== false;
-  currentRepos = config.repos;
 
-  reposList.innerHTML = "";
-  if (config.repos.length === 0) {
-    addRepoRow();
-    switchView("settings");
-  } else {
-    config.repos.forEach(addRepoRow);
-  }
+  loadReposIntoForm(config.repos);
+  if (config.repos.length === 0) switchView("settings");
 
   currentSummaries = await window.api.getSummaries();
   renderDashboard();
@@ -870,6 +986,17 @@ async function init() {
       dndUntil = until;
       renderDndUI();
     });
+  }
+  if (window.api.onNextInterval) {
+    window.api.onNextInterval((ms) => {
+      if (!ms) return;
+      currentPollIntervalMs = ms;
+      if (isWatcherRunning) resetPollCountdown();
+    });
+  }
+  if (window.api.getNextInterval) {
+    const ms = await window.api.getNextInterval();
+    if (ms) currentPollIntervalMs = ms;
   }
 }
 

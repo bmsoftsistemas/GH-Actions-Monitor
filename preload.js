@@ -50,4 +50,13 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("update:installing", listener);
   },
   getVersion: () => ipcRenderer.invoke("app:get-version"),
+  testTokenValidity: (token) => ipcRenderer.invoke("watcher:test-token-validity", { token }),
+  getNextInterval: () => ipcRenderer.invoke("watcher:get-next-interval"),
+  onNextInterval: (callback) => {
+    const listener = (_event, ms) => callback(ms);
+    ipcRenderer.on("watcher:next-interval", listener);
+    return () => ipcRenderer.removeListener("watcher:next-interval", listener);
+  },
+  exportConfig: () => ipcRenderer.invoke("config:export"),
+  importConfig: () => ipcRenderer.invoke("config:import"),
 });

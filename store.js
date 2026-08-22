@@ -31,6 +31,7 @@ function normalizeRepo(repo) {
     muted: !!repo.muted,
     notifyMode: NOTIFY_MODES.includes(repo.notifyMode) ? repo.notifyMode : "all",
     mutedBranches: Array.isArray(repo.mutedBranches) ? repo.mutedBranches : [],
+    group: typeof repo.group === "string" ? repo.group.trim() : "",
   };
 }
 

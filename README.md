@@ -30,7 +30,11 @@ ainda) e coloca um ícone na bandeja do sistema.
    access tokens, com escopo `repo` em token classic, ou permissão
    "Actions: Read and write" em fine-grained — o "and write" é necessário
    para re-executar, cancelar e disparar workflows manualmente, não só
-   para monitorar).
+   para monitorar). Use o botão **"Testar token"** pra confirmar na hora
+   se é válido — mostra o usuário, o tipo (classic/fine-grained) e, pra
+   token classic, os escopos concedidos (fine-grained não expõe isso pela
+   API; nesse caso teste o acesso a um repo específico com o 🔎 de cada
+   linha).
 2. Adicione os repositórios (`owner` + `repo`). Opcionalmente, digite o
    nome de um ou mais arquivos de workflow (ex: `ci.yml`, Enter para
    adicionar cada um) para filtrar quais workflows monitorar — deixe vazio
@@ -42,29 +46,45 @@ ainda) e coloca um ícone na bandeja do sistema.
    Notificar só falhas / Falhas + quando voltar a passar"** e o campo de
    branches pra silenciar notificações só de branches específicas (nome
    exato, ex: `dev`) sem silenciar o repo inteiro.
-4. Clique em **Salvar**. Se o monitoramento já estiver ligado, ele reinicia
+4. Opcionalmente, dê um **grupo** pro repositório (ex: `Backend`,
+   `Frontend`, `DevOps`) — no dashboard, os cards ficam organizados em
+   seções por grupo (repos sem grupo caem numa seção "Sem grupo" no
+   final). Use **Importar/Exportar** pra compartilhar a lista de
+   repositórios (com grupos, filtros de workflow e preferências de
+   notificação) com a equipe — o Token nunca entra no arquivo exportado.
+   Importar soma repositórios novos à sua lista atual sem duplicar os que
+   já existem (por owner/repo).
+5. Clique em **Salvar**. Se o monitoramento já estiver ligado, ele reinicia
    automaticamente com a nova configuração.
-5. Na aba **Monitoramento**, cada repositório aparece como um card
-   (ordenado com falhas primeiro) — usa os mesmos ícones de status do
-   GitHub Actions (✓ verde, ✕ vermelho, spinner amarelo pra em andamento).
-   Use os botões **Todos / Apenas falhas / Rodando agora** para filtrar.
+6. Na aba **Monitoramento**, cada repositório aparece como um card
+   (ordenado com falhas primeiro dentro de cada grupo) — usa os mesmos
+   ícones de status do GitHub Actions (✓ verde, ✕ vermelho, spinner
+   amarelo pra em andamento). Use os botões **Todos / Apenas falhas /
+   Rodando agora** para filtrar.
    Passe o mouse sobre um card (ou linha do histórico, no ▾) pra ver ações
    rápidas: abrir no navegador, cancelar (se estiver rodando) ou
    re-executar (se falhou) — sem precisar sair do app.
-6. Clique numa linha do histórico (▾) para expandir os **jobs e steps**
+7. Clique numa linha do histórico (▾) para expandir os **jobs e steps**
    daquela execução. Se um step falhou, clique nele pra ver as últimas 50
    linhas do log direto no app (a API do GitHub só expõe o log inteiro do
    job — o app tenta isolar só o trecho daquele step pelos marcadores do
    log; quando não consegue, mostra um aviso e cai pro final do log
    completo do job).
-7. Use o ícone ▶ no card para **disparar um workflow manualmente**
+8. Use o ícone ▶ no card para **disparar um workflow manualmente**
    (`workflow_dispatch`) — informe o arquivo do workflow, a branch/tag e,
    opcionalmente, inputs em JSON.
-8. Clique com o botão direito no ícone da bandeja para Iniciar/Parar,
+9. Clique com o botão direito no ícone da bandeja para Iniciar/Parar,
    abrir Configurações ou Sair.
 
 O rodapé da janela mostra o consumo da cota da API do GitHub (ex: "API:
 4500/5000 requisições restantes"), ficando amarelo quando perto do limite.
+
+**Smart polling**: o intervalo configurado é só a linha de base — o app
+acelera pra no máximo 10s enquanto algum workflow estiver rodando/na fila
+(pra pegar a conclusão logo), e relaxa pra pelo menos 2 minutos fora do
+horário comercial (fim de semana ou antes das 7h) quando nada está
+rodando, economizando cota da API. O contador "Próxima verificação em..."
+já reflete o intervalo efetivo, não só o configurado.
 
 Em **Configurações**, "Tocar som ao concluir um build" ativa um bipe curto
 sintetizado (sem depender de nenhum arquivo de áudio) — sutil no sucesso,

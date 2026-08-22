@@ -103,7 +103,9 @@
               <button id="toggle-token-visibility" class="icon-btn" type="button" title="Mostrar/ocultar token">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
+              <button id="test-token-btn" class="ghost-btn" type="button">Testar token</button>
             </div>
+            <p id="token-test-result" class="hint" hidden></p>
             <p class="hint">
               Precisa de <code>repo</code> em token classic, ou permissão "Actions: Read and
               write" em fine-grained (o "write" é usado por re-executar, cancelar e disparar workflows).
@@ -133,9 +135,16 @@
           <div class="field">
             <div class="repos-header">
               <label>Repositórios monitorados</label>
-              <button id="add-repo-btn" class="ghost-btn" type="button">+ Adicionar</button>
+              <div class="repos-header-actions">
+                <button id="import-config-btn" class="ghost-btn" type="button">Importar</button>
+                <button id="export-config-btn" class="ghost-btn" type="button">Exportar</button>
+                <button id="add-repo-btn" class="ghost-btn" type="button">+ Adicionar</button>
+              </div>
             </div>
+            <p class="hint">Exportar/Importar não inclui o Token — só a lista de repositórios,
+              grupos e preferências de notificação, pra compartilhar com a equipe.</p>
             <div id="repos-list"></div>
+            <datalist id="repo-groups-list"></datalist>
           </div>
         </div>
 
@@ -164,6 +173,9 @@
         <button class="remove-repo-btn" type="button" title="Remover">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
+      </div>
+      <div class="repo-row-group">
+        <input type="text" class="repo-group-input" list="repo-groups-list" placeholder="Grupo (opcional, ex: Backend) — agrupa no dashboard" />
       </div>
       <div class="repo-row-workflows">
         <div class="workflow-chips"></div>

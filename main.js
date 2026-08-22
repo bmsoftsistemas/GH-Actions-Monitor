@@ -1,8 +1,17 @@
-const { app, Tray, Menu, BrowserWindow, Notification, ipcMain, shell, nativeImage } = require("electron");
+const { app, Tray, Menu, BrowserWindow, Notification, ipcMain, shell, nativeImage, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
+const fs = require("fs");
 const { loadConfig, saveConfig, loadRunState, saveRunState } = require("./store");
-const { checkAll, rerunRun, cancelRun, fetchJobs, fetchJobLog, dispatchWorkflow } = require("./watcher");
+const {
+  checkAll,
+  rerunRun,
+  cancelRun,
+  fetchJobs,
+  fetchJobLog,
+  dispatchWorkflow,
+  checkTokenValidity,
+} = require("./watcher");
 
 let tray = null;
 let settingsWindow = null;
@@ -16,6 +25,7 @@ let lastRateLimit = null;
 let lastUpdateStatus = { state: "idle" };
 let updateReady = false;
 let dndUntil = null;
+let lastEffectiveIntervalMs = null;
 
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
@@ -127,6 +137,50 @@ async function pollOnce() {
   }
 }
 
+/**
+ * Smart polling: enquanto algo estiver rodando/na fila, cheque mais rápido
+ * (até 10s) pra pegar a conclusão logo; sem nada rodando e fora do horário
+ * comercial (fim de semana ou madrugada, antes das 7h), relaxa pra pelo
+ * menos 2 minutos — economiza cota da API quando ninguém tá olhando.
+ */
+function isOffHours() {
+  const now = new Date();
+  const day = now.getDay(); // 0 = domingo, 6 = sábado
+  return day === 0 || day === 6 || now.getHours() < 7;
+}
+
+function computeNextIntervalMs() {
+  const config = loadConfig();
+  const base = config.pollIntervalMs || 30000;
+  const hasRunning = lastSummaries.some(
+    (s) => s && !s.error && !s.empty && s.status && s.status !== "completed"
+  );
+  if (hasRunning) return Math.min(base, 10000);
+  if (isOffHours()) return Math.max(base, 120000);
+  return base;
+}
+
+function pushNextInterval() {
+  if (settingsWindow) {
+    settingsWindow.webContents.send("watcher:next-interval", lastEffectiveIntervalMs);
+  }
+}
+
+function scheduleNextPoll() {
+  const intervalMs = computeNextIntervalMs();
+  lastEffectiveIntervalMs = intervalMs;
+  pushNextInterval();
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = setTimeout(runPollCycle, intervalMs);
+}
+
+async function runPollCycle() {
+  await pollOnce();
+  if (isRunning && !(rateLimitedUntil && Date.now() < rateLimitedUntil)) {
+    scheduleNextPoll();
+  }
+}
+
 function rateLimitWarning(rateLimit) {
   if (!rateLimit || !rateLimit.limit) return "";
   if (rateLimit.remaining > rateLimit.limit * 0.15) return "";
@@ -142,7 +196,7 @@ function pauseForRateLimit(resetAt) {
   const resumeAt = new Date(resetAt).getTime() + 5000; // pequena folga
   rateLimitedUntil = resumeAt;
 
-  if (pollTimer) clearInterval(pollTimer);
+  if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
   if (resumeTimer) clearTimeout(resumeTimer);
 
@@ -154,9 +208,7 @@ function pauseForRateLimit(resetAt) {
     resumeTimer = null;
     rateLimitedUntil = null;
     if (!isRunning) return;
-    const config = loadConfig();
-    pollOnce();
-    pollTimer = setInterval(pollOnce, config.pollIntervalMs || 30000);
+    runPollCycle();
   }, delay);
 }
 
@@ -274,19 +326,18 @@ function startWatching() {
     openSettingsWindow();
     return;
   }
-  if (pollTimer) clearInterval(pollTimer);
+  if (pollTimer) clearTimeout(pollTimer);
   if (resumeTimer) clearTimeout(resumeTimer);
   resumeTimer = null;
   rateLimitedUntil = null;
   isRunning = true;
-  pollOnce();
-  pollTimer = setInterval(pollOnce, config.pollIntervalMs || 30000);
+  runPollCycle();
   updateTrayMenu();
   pushStatus();
 }
 
 function stopWatching() {
-  if (pollTimer) clearInterval(pollTimer);
+  if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
   if (resumeTimer) clearTimeout(resumeTimer);
   resumeTimer = null;
@@ -448,6 +499,82 @@ app.whenReady().then(() => {
     } catch (err) {
       return { ok: false, status: 0, error: err.message };
     }
+  });
+
+  ipcMain.handle("watcher:test-token-validity", async (_event, { token }) => {
+    try {
+      return await checkTokenValidity(token);
+    } catch (err) {
+      return { ok: false, status: 0, error: err.message };
+    }
+  });
+
+  ipcMain.handle("watcher:get-next-interval", () => lastEffectiveIntervalMs);
+
+  ipcMain.handle("config:export", async () => {
+    const config = loadConfig();
+    const { canceled, filePath } = await dialog.showSaveDialog(settingsWindow, {
+      title: "Exportar configuração",
+      defaultPath: "gh-actions-watcher-config.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+
+    const exportData = {
+      pollIntervalMs: config.pollIntervalMs,
+      repos: config.repos.map(({ owner, repo, workflowFiles, muted, notifyMode, mutedBranches, group }) => ({
+        owner,
+        repo,
+        workflowFiles,
+        muted,
+        notifyMode,
+        mutedBranches,
+        group,
+      })),
+    };
+    fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2));
+    return { ok: true, filePath };
+  });
+
+  ipcMain.handle("config:import", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(settingsWindow, {
+      title: "Importar configuração",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+    if (canceled || filePaths.length === 0) return { ok: false, canceled: true };
+
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+    } catch (err) {
+      return { ok: false, error: `Arquivo inválido: ${err.message}` };
+    }
+    if (!Array.isArray(data.repos)) {
+      return { ok: false, error: 'O JSON precisa ter uma lista "repos".' };
+    }
+
+    const config = loadConfig();
+    const existingKeys = new Set(config.repos.map((r) => `${r.owner}/${r.repo}`));
+    let added = 0;
+    for (const r of data.repos) {
+      if (!r.owner || !r.repo) continue;
+      const key = `${r.owner}/${r.repo}`;
+      if (existingKeys.has(key)) continue;
+      config.repos.push({
+        owner: r.owner,
+        repo: r.repo,
+        workflowFiles: Array.isArray(r.workflowFiles) ? r.workflowFiles : [],
+        muted: !!r.muted,
+        notifyMode: ["all", "failure-only", "failure-and-fixed"].includes(r.notifyMode) ? r.notifyMode : "all",
+        mutedBranches: Array.isArray(r.mutedBranches) ? r.mutedBranches : [],
+        group: typeof r.group === "string" ? r.group : "",
+      });
+      existingKeys.add(key);
+      added++;
+    }
+    saveConfig(config);
+    return { ok: true, added, skipped: data.repos.length - added, config };
   });
 });
 

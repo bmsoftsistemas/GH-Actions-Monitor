@@ -268,6 +268,21 @@ body {
 /* ---------- Dashboard / repo cards ---------- */
 
 .repo-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.repo-group-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.repo-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 12px;
@@ -523,6 +538,12 @@ button:hover { background: var(--accent-hover); }
 
 .repos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .repos-header label { margin: 0; }
+.repos-header-actions { display: flex; gap: 6px; }
+
+.repo-row-group { margin-top: 6px; }
+
+#token-test-result.token-test-ok { color: var(--green); }
+#token-test-result.token-test-error { color: var(--danger-text); }
 
 .repo-row {
   display: flex;

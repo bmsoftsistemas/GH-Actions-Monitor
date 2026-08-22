@@ -1,6 +1,15 @@
 const { test, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-const { checkAll, rerunRun, cancelRun, fetchJobs, fetchJobLog, extractStepLog, dispatchWorkflow } = require("../watcher");
+const {
+  checkAll,
+  rerunRun,
+  cancelRun,
+  fetchJobs,
+  fetchJobLog,
+  extractStepLog,
+  dispatchWorkflow,
+  checkTokenValidity,
+} = require("../watcher");
 
 const originalFetch = global.fetch;
 
@@ -291,4 +300,39 @@ test("dispatchWorkflow retorna erro com a mensagem da API quando falha", async (
   assert.equal(result.ok, false);
   assert.equal(result.status, 404);
   assert.equal(result.error, "Workflow não encontrado");
+});
+
+test("checkTokenValidity reconhece token classic e lê os escopos", async () => {
+  global.fetch = async () =>
+    fakeResponse({
+      status: 200,
+      headers: { "x-oauth-scopes": "repo, workflow" },
+      body: { login: "octocat" },
+    });
+
+  const result = await checkTokenValidity("ghp_abc123");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.login, "octocat");
+  assert.equal(result.tokenType, "classic");
+  assert.deepEqual(result.scopes, ["repo", "workflow"]);
+});
+
+test("checkTokenValidity reconhece token fine-grained sem escopos no header", async () => {
+  global.fetch = async () => fakeResponse({ status: 200, body: { login: "octocat" } });
+
+  const result = await checkTokenValidity("github_pat_abc123");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.tokenType, "fine-grained");
+  assert.deepEqual(result.scopes, []);
+});
+
+test("checkTokenValidity retorna ok:false para token inválido", async () => {
+  global.fetch = async () => fakeResponse({ ok: false, status: 401, body: { message: "Bad credentials" } });
+
+  const result = await checkTokenValidity("ghp_invalido");
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 401);
 });
